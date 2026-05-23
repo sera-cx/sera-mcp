@@ -38,19 +38,43 @@ export async function doctor(ctx: AppContext) {
   }
 
   // 2. /config + network sanity
+  let liveCfg: Awaited<ReturnType<typeof ctx.sera.getConfig>> | undefined;
   try {
-    const cfg = await ctx.sera.getConfig();
+    liveCfg = await ctx.sera.getConfig();
     const expected = ctx.cfg.network === "mainnet" ? 1 : 11155111;
-    const networkOk = cfg.chain_id === expected;
+    const networkOk = liveCfg.chain_id === expected;
     checks.push({
       name: "network_sanity",
       ok: networkOk,
       detail: networkOk
-        ? `chain_id=${cfg.chain_id} matches SERA_NETWORK=${ctx.cfg.network}`
-        : `MISMATCH: SERA_NETWORK=${ctx.cfg.network} but /config returned chain_id=${cfg.chain_id}`,
+        ? `chain_id=${liveCfg.chain_id} matches SERA_NETWORK=${ctx.cfg.network}`
+        : `MISMATCH: SERA_NETWORK=${ctx.cfg.network} but /config returned chain_id=${liveCfg.chain_id}`,
     });
   } catch (e: any) {
     checks.push({ name: "network_sanity", ok: false, detail: e?.message ?? String(e) });
+  }
+
+  // 2b. Contract addresses surfaced from /config — operators want to see what
+  // they'll actually be signing against. Use these (not hardcoded) for any
+  // signed payload; addresses can drift between deployments.
+  if (liveCfg) {
+    checks.push({
+      name: "contracts",
+      ok: !!(liveCfg.sera_address && liveCfg.vault_address && liveCfg.sor_address),
+      detail:
+        `sera=${liveCfg.sera_address ?? "?"} vault=${liveCfg.vault_address ?? "?"} ` +
+        `sor=${liveCfg.sor_address ?? "?"}`,
+    });
+
+    // 2c. VL batch limits from /config (read at startup; don't hardcode).
+    const vl = liveCfg.limits?.vl_batch;
+    if (vl) {
+      checks.push({
+        name: "vl_batch_limits",
+        ok: true,
+        detail: `min=${vl.min} max=${vl.max} (live cap from /config — use sera.place_vl_batch with ≤ max siblings)`,
+      });
+    }
   }
 
   // 3. /tokens loadable

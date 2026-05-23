@@ -211,6 +211,74 @@ export interface BatchQuoteResponse {
   items: BatchQuoteItem[];
 }
 
+// ─── Order endpoints ────────────────────────────────────────────────────
+
+export interface PlaceOrderRequest {
+  owner_address: string;
+  side: "bid" | "ask";
+  amount: string;       // human decimal
+  price: string;        // human decimal (quote per base)
+  order_type: "limit";
+  from_address: string; // market base token
+  to_address: string;   // market quote token
+  order_id: string;     // UUID4
+  uuid_int: string;     // composite uint256 decimal
+  signature: string;
+  expiration: number;
+}
+
+export interface PlaceOrderResponse {
+  order_id: string;
+}
+
+export interface CancelOrderRequest {
+  owner_address: string;
+  order_id: string;
+  uuid_int: string;
+  signature: string;
+}
+
+export interface CancelAllResponse {
+  cancelled: string[];
+  failed: string[];
+  skipped_cooldown: string[];
+  total: number;
+}
+
+export interface PlaceVlBatchRequest {
+  orders: PlaceOrderRequest[];
+}
+
+export interface VlAmendment {
+  order_id: string;
+  original_amount: string;
+  actual_amount: string;
+  reason: string;
+}
+
+export interface PlaceVlBatchResponse {
+  order_ids: string[];
+  amendments: VlAmendment[];
+  cancelled: Array<{ order_id: string; reason: string }>;
+  fills: Array<{
+    order_id: string;
+    trades: Array<{ quantity: string; price: string; counterparty_order_id: string; ts: number }>;
+    remaining: string;
+  }>;
+  vl_group: {
+    primary_id: string;
+    max_budget: string;
+    budget_consumed: string;
+    spent_token: string;
+  };
+}
+
+export interface CancelVlBatchRequest {
+  owner_address: string;
+  vl_batch_id: string;
+  signature: string;
+}
+
 export interface SeraErrorBody {
   detail?: string | { detail?: string; error_code?: string };
 }

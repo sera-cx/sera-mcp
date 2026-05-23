@@ -2,6 +2,43 @@
 
 All notable changes to `sera-mcp` are documented in this file. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] — 2026-05-24
+
+### Added — maker / order-book tools (9 tools, 42 → 51 total)
+- `sera.place_order` — submit a signed limit order. Agent picks client-side `order_id` (UUID4) so POST /orders is idempotent. Returns `{ order_id }`.
+- `sera.cancel_order` — signed cancel via composite `uuid_int`. 5-min per-order cooldown.
+- `sera.cancel_all_orders` — bulk kill-switch. Returns `cancelled` / `failed` / `skipped_cooldown` lists.
+- `sera.place_vl_batch` — 2-50 signed orders sharing one collateral pool. Matching engine freezes only the largest single-leg cost, not the sum. Validates sibling-owner + sibling-fromToken at the boundary.
+- `sera.cancel_vl_batch` — cancel a whole VL batch by `vl_batch_id`.
+- `sera.get_order` — single order with full `settlement_summary` + `settlement_economics`.
+- `sera.list_orders` — rich filter surface (status / type / symbol / side / token / price / amount / notional / time / sort). `limit` max 500.
+- `sera.get_fills` — fills across orders with per-fill `settlement_economics`.
+- `sera.get_fills_for_order` — fills for one specific order.
+
+New tool category: `maker`. The MCP forwards signed payloads as-is; the agent constructs `uuid_int` and signs Order / CancelOrder / CancelVLBatch structs under the Sera EIP-712 domain. Server-side maker signing for local-signer mode is planned for a future release.
+
+### Added — doctor enrichment
+`sera.doctor` now surfaces three additional checks:
+- `contracts` — live `sera_address`, `vault_address`, `sor_address` from `/config` (use these for any signed payload; addresses can drift between deployments).
+- `vl_batch_limits` — live `min` / `max` from `/config → limits.vl_batch`. Don't hardcode the cap.
+- The existing `network_sanity` and `executor_id` checks also moved to read from `liveCfg` once instead of fetching twice.
+
+### Added — `outputSchema` + `structuredContent` (incremental migration)
+Set on 4 tools to establish the pattern:
+- `sera.doctor` → `DoctorOutput` (overall_ok + checks[])
+- `sera.list_currencies` → `ListCurrenciesOutput`
+- `sera.get_fx_rate` → `FxRateOutput`
+- `sera.market_health` → `MarketHealthOutput`
+
+When a tool has `outputSchema`, the MCP response emits `structuredContent` alongside the human-readable text. Hosts that validate/render structured output use it; agents without structured-content support fall back to text seamlessly. Migration to full coverage is incremental — remaining tools planned across v0.7.x patches.
+
+### Updated — `sera://help/tools` resource
+Reflects the full 51-tool surface (was 32). New sections for account/funds, withdraw, maker, debugging.
+
+### Notes
+- 81 tests still pass after additions.
+- `tools/call sera.doctor` verified emitting `structuredContent` with 9 checks (was 6 in v0.5.x).
+
 ## [0.6.0] — 2026-05-24
 
 ### Added — 11 new tools (32 → 42 total)

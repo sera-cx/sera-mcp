@@ -454,10 +454,133 @@ export const VerifySignatureInput = z.object({
   expiration: z.number().int().positive(),
 });
 
+// ─────────────────────────────────────────────────────────── output schemas
+// Output schemas drive MCP's `structuredContent` field. Hosts that validate
+// or render tool output use these. Migration is incremental — start with
+// tools whose return shape is fully controlled in this codebase.
+
+export const DoctorOutput = z.object({
+  network_label: z.enum(["mainnet", "sepolia"]),
+  base_url: z.string(),
+  overall_ok: z.boolean(),
+  checks: z.array(
+    z.object({ name: z.string(), ok: z.boolean(), detail: z.string() }),
+  ),
+});
+
+export const MarketHealthOutput = z.object({
+  pair: z.string(),
+  status: z.enum(["quotable", "no_liquidity", "unknown_pair", "error"]),
+  detail: z.string().optional(),
+});
+
+export const FxRateOutput = z.object({
+  pair: z.string(),
+  rate: z.string(),
+  as_of: z.number().optional(),
+  rate_24h_ago: z.union([z.string(), z.null()]).optional(),
+  as_of_24h_ago: z.union([z.number(), z.null()]).optional(),
+  change_pct: z.union([z.string(), z.null()]).optional(),
+}).passthrough();
+
+export const ListCurrenciesOutput = z.object({
+  count: z.number(),
+  policy_allowed_symbols: z.union([z.array(z.string()), z.literal("all")]),
+  tokens: z.array(
+    z.object({
+      symbol: z.string(),
+      fiat_currency: z.string().optional(),
+      address: z.string(),
+      decimals: z.number(),
+      policy_allowed: z.boolean(),
+    }),
+  ),
+});
+
 // ──────────────────────────────────────────────────────── permit metadata
 export const PermitMetadataInput = z.object({
   token: EvmAddress.describe("ERC-20 token to check for EIP-2612 support."),
   owner: EvmAddress.describe("Wallet that may sign permit."),
   spender: EvmAddress.describe("Allowance target — typically vault_address or sor_address (from sera://config)."),
   amount: Uint256Decimal.optional().describe("Raw amount to compare against current allowance. When set, response includes `required: bool`."),
+});
+
+// ──────────────────────────────────────────────────────── maker / orders
+// All order placements take a wire-payload (pair-natural fields) AND a signed
+// EIP-712 Order struct. The MCP forwards as-is to Sera — the agent signs.
+
+const OrderSide = z.enum(["bid", "ask"]);
+
+const SignedOrderBody = z.object({
+  owner_address: EvmAddress,
+  side: OrderSide,
+  amount: DecimalAmount.describe("Quantity in base-token natural units."),
+  price: DecimalAmount.describe("Quote per base, natural units."),
+  order_type: z.literal("limit"),
+  from_address: EvmAddress.describe("Market BASE token address (not spend direction)."),
+  to_address: EvmAddress.describe("Market QUOTE token address."),
+  order_id: Uuid.describe("Client-picked UUID4 (server dedupes — safe to retry)."),
+  uuid_int: z.string().regex(/^\d+$/, "uint256 decimal"),
+  signature: HexSignature.describe("EIP-712 signature over the Order struct under the Sera domain."),
+  expiration: z.number().int().positive(),
+});
+
+export const PlaceOrderInput = SignedOrderBody;
+
+export const CancelOrderInput = z.object({
+  owner_address: EvmAddress,
+  order_id: Uuid,
+  uuid_int: z.string().regex(/^\d+$/, "uint256 decimal"),
+  signature: HexSignature,
+});
+
+export const CancelAllOrdersInput = z.object({
+  owner_address: EvmAddress.describe("Must match the authenticated API-key owner."),
+});
+
+export const PlaceVlBatchInput = z.object({
+  orders: z.array(SignedOrderBody).min(2).max(50).describe("2–50 signed orders. All must share the same owner_address and same fromToken; uuid_int's must share a single VL group_id; leg_id's must be 0,1,2,… in array order."),
+});
+
+export const CancelVlBatchInput = z.object({
+  owner_address: EvmAddress,
+  vl_batch_id: Uuid,
+  signature: HexSignature,
+});
+
+export const GetOrderInput = z.object({
+  order_id: Uuid,
+});
+
+export const ListOrdersInput = z.object({
+  owner_address: EvmAddress,
+  limit: z.number().int().min(1).max(500).optional(),
+  offset: z.number().int().nonnegative().optional(),
+  status: z.enum(["pending", "matched", "settled", "cancelled", "failed"]).optional(),
+  type: z.enum(["swap", "limit"]).optional(),
+  symbol: z.string().optional().describe("e.g. 'EURC/USDC'."),
+  side: OrderSide.optional(),
+  from_token: EvmAddress.optional(),
+  to_token: EvmAddress.optional(),
+  base_token: EvmAddress.optional(),
+  quote_token: EvmAddress.optional(),
+  has_error: z.boolean().optional(),
+  created_after: z.string().optional(),
+  created_before: z.string().optional(),
+  sort_by: z.string().optional(),
+  order: z.enum(["asc", "desc"]).optional(),
+});
+
+export const GetFillsInput = z.object({
+  owner_address: EvmAddress,
+  order_status: z.enum(["pending", "matched", "settled", "cancelled", "failed"]).optional(),
+  settlement_status: z.enum(["pending", "confirming", "settled", "failed", "reverted"]).optional(),
+  limit: z.number().int().min(1).max(500).optional(),
+  offset: z.number().int().nonnegative().optional(),
+});
+
+export const GetFillsForOrderInput = z.object({
+  order_id: Uuid,
+  limit: z.number().int().min(1).max(500).optional(),
+  offset: z.number().int().nonnegative().optional(),
 });

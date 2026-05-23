@@ -3,8 +3,15 @@ import type {
   BalancesResponse,
   BatchQuoteResponse,
   BuildTxResponse,
+  CancelAllResponse,
+  CancelOrderRequest,
+  CancelVlBatchRequest,
   FxRateResponse,
   PermitMetadataResponse,
+  PlaceOrderRequest,
+  PlaceOrderResponse,
+  PlaceVlBatchRequest,
+  PlaceVlBatchResponse,
   SeraConfig,
   SeraMarket,
   SeraToken,
@@ -329,6 +336,51 @@ export class SeraClient {
   // Step 4: broadcast the locally-signed tx.
   async withdrawSend(rawTx: string): Promise<TxSendResponse> {
     return this.call("POST", "/withdraw/send", { body: { raw_tx: rawTx } });
+  }
+
+  // ---- Order placement (EIP-712 signed body) ----
+  async postOrder(body: PlaceOrderRequest): Promise<PlaceOrderResponse> {
+    return this.call("POST", "/orders", { body });
+  }
+
+  async cancelOrder(body: CancelOrderRequest): Promise<{ status: string }> {
+    return this.call("POST", "/orders/cancel", { body });
+  }
+
+  async cancelAllOrders(ownerAddress: string): Promise<CancelAllResponse> {
+    return this.call("DELETE", "/orders/cancel-all", {
+      query: { owner_address: lowerOwner(ownerAddress) },
+      auth: true,
+    });
+  }
+
+  async postVlBatch(body: PlaceVlBatchRequest): Promise<PlaceVlBatchResponse> {
+    return this.call("POST", "/orders/vl/batch", { body });
+  }
+
+  async cancelVlBatch(body: CancelVlBatchRequest): Promise<{ status: string }> {
+    return this.call("POST", "/orders/vl/cancel", { body });
+  }
+
+  // ---- Order/fill reads (API Key) ----
+  async getOrder(orderId: string): Promise<unknown> {
+    return this.call("GET", `/orders/${encodeURIComponent(orderId)}`, { auth: true });
+  }
+
+  async getFills(filters: Record<string, string | number | undefined> = {}): Promise<unknown> {
+    const q = { ...filters };
+    if (typeof q.owner_address === "string") q.owner_address = lowerOwner(q.owner_address);
+    return this.call("GET", "/fills", { query: q, auth: true });
+  }
+
+  async getFillsForOrder(
+    orderId: string,
+    filters: Record<string, string | number | undefined> = {},
+  ): Promise<unknown> {
+    return this.call("GET", `/fills/${encodeURIComponent(orderId)}`, {
+      query: filters,
+      auth: true,
+    });
   }
 }
 

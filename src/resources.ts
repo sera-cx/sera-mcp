@@ -37,8 +37,8 @@ export function listResources(): ResourceDescriptor[] {
     },
     {
       uri: "sera://config",
-      name: "Sera protocol config",
-      description: "chain_id, sera_address, vault_address, sor_address.",
+      name: "Sera protocol config (live)",
+      description: "Live pull from GET /config: chain_id, sera_address, vault_address, sor_address, domain_separator, eip712_domain, limits.vl_batch. Use these for any signed payload; contract addresses can drift between deployments.",
       mimeType: "application/json",
     },
     {
@@ -85,7 +85,7 @@ export async function readResource(ctx: AppContext, uri: string): Promise<Resour
   }
 }
 
-const TOOLS_HELP = `# sera.* tool reference (32 tools)
+const TOOLS_HELP = `# sera.* tool reference (51 tools)
 
 ## Discovery
 - **sera.list_currencies** — registry of supported stablecoins (filterable by fiat).
@@ -128,8 +128,29 @@ const TOOLS_HELP = `# sera.* tool reference (32 tools)
 ## History (requires SERA_HISTORY_DB)
 - **sera.fx_history / sera.fx_volatility / sera.corridor_pnl** — series + stats from logged calls.
 
+## Account / funds (require SERA_API_KEY; destructive send_* tools move money)
+- **sera.build_approve / sera.send_tx** — build + broadcast an ERC-20 approve.
+- **sera.build_deposit / sera.send_tx** — fund the vault. build_deposit optionally takes permit_signature for one-tx approve+deposit.
+- **sera.build_transfer / sera.send_transfer** — ERC-20 transfer.
+
+## Withdraw (4-step dual-sig)
+- **sera.withdraw_request** — step 1: user signs WithdrawIntent; returns executor co-signature.
+- **sera.withdraw_build** — step 2: returns unsigned tx with both signatures.
+- **sera.withdraw_send** — step 4: broadcast (step 3 is local signing).
+
+## Maker / order book
+- **sera.place_order / sera.cancel_order / sera.cancel_all_orders** — limit orders.
+- **sera.place_vl_batch / sera.cancel_vl_batch** — Virtual Liquidity (multi-pair from one collateral pool).
+- **sera.get_order / sera.list_orders** — order state + history.
+- **sera.get_fills / sera.get_fills_for_order** — fill detail with settlement_economics.
+
+## Debugging / helpers
+- **sera.batch_quote** — wraps POST /swap/quote/batch (1-50 quotes/round-trip).
+- **sera.verify_signature** — test EIP-712 sig without burning a quote.
+- **sera.permit_metadata** — EIP-2612 support + nonce + current allowance.
+
 ## Admin
-- **sera.doctor** — health, config sanity, signer mode, policy summary, persistence state in one call.
+- **sera.doctor** — health, config sanity, signer mode, policy summary, persistence state, executor_id, contract addresses, VL batch limits in one call.
 `;
 
 const QUICKSTART = `# Sera MCP — quickstart

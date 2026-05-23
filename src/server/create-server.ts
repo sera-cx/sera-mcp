@@ -20,7 +20,7 @@ import { listResources, readResource } from "../resources.js";
 import { listPrompts, getPrompt } from "../prompts.js";
 import { log } from "../util/logger.js";
 
-const VERSION = "0.6.0";
+const VERSION = "0.7.0";
 
 export function createServer(ctx: AppContext): {
   server: McpServer;
@@ -98,6 +98,7 @@ function registerTool(
       title: t.title,
       description: t.description,
       inputSchema: t.inputSchema,
+      ...(t.outputSchema ? { outputSchema: t.outputSchema } : {}),
       annotations: t.annotations,
     },
     async (rawArgs: unknown) => {
@@ -106,10 +107,15 @@ function registerTool(
         const t0 = Date.now();
         const result = await t.handler(ctx, parsed);
         log.debug("tool ok", { tool: t.name, ms: Date.now() - t0 });
+        // structuredContent is emitted whenever outputSchema is declared on
+        // the tool. Hosts that validate/render structured output use this
+        // alongside the human-readable text content.
+        const text = JSON.stringify(result, null, 2);
         return {
-          content: [
-            { type: "text" as const, text: JSON.stringify(result, null, 2) },
-          ],
+          content: [{ type: "text" as const, text }],
+          ...(t.outputSchema
+            ? { structuredContent: result as Record<string, unknown> }
+            : {}),
         };
       } catch (err: any) {
         log.warn("tool error", {

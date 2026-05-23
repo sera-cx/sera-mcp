@@ -12,7 +12,7 @@
  * import the handler. No further wiring needed.
  */
 
-import { z, type ZodTypeAny } from "zod";
+import type { ZodTypeAny } from "zod";
 
 import type { AppContext } from "../config.js";
 
@@ -21,10 +21,17 @@ import {
   BuildApproveInput,
   BuildDepositInput,
   BuildTransferInput,
+  CancelAllOrdersInput,
+  CancelOrderInput,
+  CancelVlBatchInput,
   CompareCorridorsInput,
   CompareToExternalFxInput,
   ConvertAndSendInput,
   DoctorInput,
+  DoctorOutput,
+  FxRateOutput,
+  ListCurrenciesOutput,
+  MarketHealthOutput,
   ExecuteSwapInput,
   ExposureReportInput,
   FindCheapestPathInput,
@@ -32,17 +39,23 @@ import {
   FxHistoryInput,
   FxQuoteDiffInput,
   GetBalancesInput,
+  GetFillsForOrderInput,
+  GetFillsInput,
   GetFxRateInput,
   GetMarketsInput,
+  GetOrderInput,
   GetQuoteInput,
   InferBookInput,
   LimitWatcherInput,
   ListCurrenciesInput,
+  ListOrdersInput,
   MakerQuoteLadderInput,
   MarketHealthInput,
   MultiSourceMidInput,
   PayInvoiceInput,
   PermitMetadataInput,
+  PlaceOrderInput,
+  PlaceVlBatchInput,
   PrepareSwapInput,
   ProbeDepthInput,
   QuoteRecipientAmountInput,
@@ -106,6 +119,17 @@ import {
   withdrawSend,
 } from "./account.js";
 import { batchQuote, verifySignature, permitMetadata } from "./helpers.js";
+import {
+  placeOrder,
+  cancelOrder,
+  cancelAllOrders,
+  placeVlBatch,
+  cancelVlBatch,
+  getOrder,
+  listOrders,
+  getFillsForOrder,
+  listFills,
+} from "./maker_orders.js";
 
 /**
  * Tool capability group. Drives future read/exec server split and the
@@ -131,7 +155,8 @@ export type ToolCategory =
   | "execution"
   | "account"        // tx builders + broadcast helpers
   | "withdraw"       // dual-sig 4-step withdraw
-  | "debugging";     // verify_signature, permit_metadata
+  | "debugging"      // verify_signature, permit_metadata
+  | "maker";         // limit orders, cancels, VL batches
 
 /**
  * MCP tool annotations carried into registerTool().
@@ -155,6 +180,8 @@ export interface ToolDef {
   title: string;
   description: string;
   inputSchema: ZodTypeAny;
+  /** Optional output schema. Drives structuredContent on tool responses for hosts that validate/render output. */
+  outputSchema?: ZodTypeAny;
   annotations: ToolAnnotations;
   category: ToolCategory;
   handler: (ctx: AppContext, args: any) => Promise<unknown>;
@@ -211,6 +238,7 @@ export const TOOLS: ToolDef[] = [
     description:
       "List supported stablecoins from Sera's live token registry. Use this before any swap to discover symbols, fiat tags, addresses, and decimals. Optionally filter by fiat (e.g. fiat='SGD'). Cached 5min server-side.",
     inputSchema: ListCurrenciesInput,
+    outputSchema: ListCurrenciesOutput,
     annotations: ANN.read("List currencies"),
     category: "discovery",
     handler: (ctx, args) => listCurrencies(ctx, args ?? {}),
@@ -229,8 +257,9 @@ export const TOOLS: ToolDef[] = [
     name: "sera.doctor",
     title: "Server self-check",
     description:
-      "One-call self-check: API health, network sanity, signer mode, policy summary, persistence state. Use for quick 'is everything wired right' debugging.",
+      "One-call self-check: API health, executor_id, network sanity, contract addresses, VL batch limits, signer mode, policy summary, persistence state. Use for 'is everything wired right' debugging.",
     inputSchema: DoctorInput,
+    outputSchema: DoctorOutput,
     annotations: ANN.read("Doctor"),
     category: "discovery",
     handler: (ctx) => doctor(ctx),
@@ -243,6 +272,7 @@ export const TOOLS: ToolDef[] = [
     description:
       "Sera's reference FX rate between two ISO currency codes (e.g. base='SGD', quote='USD'). Has measurable bid/ask asymmetry — for execution price, always use sera.get_quote. To detect Sera vs market bias, pair with sera.compare_to_external_fx. Cached 60s server-side.",
     inputSchema: GetFxRateInput,
+    outputSchema: FxRateOutput,
     annotations: ANN.read("FX rate"),
     category: "pricing",
     handler: (ctx, args) => getFxRate(ctx, args),
@@ -345,6 +375,7 @@ export const TOOLS: ToolDef[] = [
     description:
       "Quick yes/no on whether a corridor is quotable right now. Fires a single $1 simulate quote and returns one of: quotable, no_liquidity, unknown_pair, error. Cheaper than burning a full quote when you only need pre-flight gating.",
     inputSchema: MarketHealthInput,
+    outputSchema: MarketHealthOutput,
     annotations: ANN.read("Market health"),
     category: "liquidity",
     handler: (ctx, args) => marketHealth(ctx, args),
@@ -660,6 +691,103 @@ export const TOOLS: ToolDef[] = [
     category: "debugging",
     handler: (ctx, args) => permitMetadata(ctx, args),
   },
+
+  // ────────────────────────────────────────────────────────────────── maker
+  // Order placement, cancellation, listing. Write paths require the agent to
+  // sign Order / CancelOrder / CancelVLBatch structs as EIP-712 under the
+  // Sera domain. The MCP forwards as-is — no server-side signing for makers
+  // in this release (planned for a future sprint alongside local-signer maker
+  // workflows).
+  {
+    name: "sera.place_order",
+    title: "Place limit order (DESTRUCTIVE — agent-signed)",
+    description:
+      "Submit a signed limit order to Sera. Agent picks order_id (UUID4), constructs uuid_int with the current executor_id (read once via sera.doctor at startup), signs the Order struct under the Sera EIP-712 domain, and submits. Order ID returned; track via sera.get_order. POST /orders is idempotent on order_id — safe to retry on network error.",
+    inputSchema: PlaceOrderInput,
+    annotations: ANN.destructive("Place order"),
+    category: "maker",
+    handler: (ctx, args) => placeOrder(ctx, args),
+  },
+  {
+    name: "sera.cancel_order",
+    title: "Cancel a single limit order (signed)",
+    description:
+      "Cancel an existing order by signing a CancelOrder struct (owner + composite uuid_int). 5-minute per-order cancel cooldown — repeated cancels of the same order_id within 5min return 429. Note: a 200 means the matching engine accepted the cancel; in-flight fills may still settle on-chain. Poll sera.get_order until settlement_summary terminalizes before clearing local state.",
+    inputSchema: CancelOrderInput,
+    annotations: ANN.destructive("Cancel order"),
+    category: "maker",
+    handler: (ctx, args) => cancelOrder(ctx, args),
+  },
+  {
+    name: "sera.cancel_all_orders",
+    title: "Cancel all open orders (API Key, DESTRUCTIVE)",
+    description:
+      "Bulk-cancel every open order for the authenticated wallet. Returns lists of cancelled / failed / skipped_cooldown order IDs. Useful for kill-switch / pause-trading workflows.",
+    inputSchema: CancelAllOrdersInput,
+    annotations: ANN.destructive("Cancel all"),
+    category: "maker",
+    handler: (ctx, args) => cancelAllOrders(ctx, args),
+  },
+  {
+    name: "sera.place_vl_batch",
+    title: "Place Virtual Liquidity batch (DESTRUCTIVE — multi-pair, capital-efficient)",
+    description:
+      "Submit 2–50 signed limit orders sharing one collateral pool. The matching engine freezes only the LARGEST single-leg cost, not the sum — quote many pairs from a single budget. All siblings must share owner_address and fromToken; uuid_int's share a VL group_id with sequential leg_id's (0, 1, 2…). Active cap from sera://config → limits.vl_batch.max.",
+    inputSchema: PlaceVlBatchInput,
+    annotations: ANN.destructive("Place VL batch"),
+    category: "maker",
+    handler: (ctx, args) => placeVlBatch(ctx, args),
+  },
+  {
+    name: "sera.cancel_vl_batch",
+    title: "Cancel a VL batch (signed)",
+    description:
+      "Cancel an entire Virtual Liquidity batch by signing a CancelVLBatch struct against the batch's vl_batch_id (primary_id of the first leg).",
+    inputSchema: CancelVlBatchInput,
+    annotations: ANN.destructive("Cancel VL batch"),
+    category: "maker",
+    handler: (ctx, args) => cancelVlBatch(ctx, args),
+  },
+  {
+    name: "sera.get_order",
+    title: "Fetch a single order (API Key)",
+    description:
+      "Returns the full order record including settlement_summary (per-fill aggregation) and settlement_economics (gross vs balance debits/credits, fees_paid). Use to track fills after sera.place_order or to recover a lost uuid_int.",
+    inputSchema: GetOrderInput,
+    annotations: ANN.read("Get order"),
+    category: "maker",
+    handler: (ctx, args) => getOrder(ctx, args),
+  },
+  {
+    name: "sera.list_orders",
+    title: "List orders with rich filters (API Key)",
+    description:
+      "Rich filtering over the wallet's order history: status, type, symbol, side, price/amount/notional ranges, time bounds, sort. limit max 500. Filters apply BEFORE pagination (so `total` reflects the full filtered set). For a single order use sera.get_order.",
+    inputSchema: ListOrdersInput,
+    annotations: ANN.read("List orders"),
+    category: "maker",
+    handler: (ctx, args) => listOrders(ctx, args),
+  },
+  {
+    name: "sera.get_fills",
+    title: "Fills across orders (API Key)",
+    description:
+      "Per-fill list (maker_order_id + taker_order_id + quantity + price + settlement_status + tx_hash + settlement_economics) filterable by order_status / settlement_status. For a single order's fills use sera.get_fills_for_order.",
+    inputSchema: GetFillsInput,
+    annotations: ANN.read("Get fills"),
+    category: "maker",
+    handler: (ctx, args) => listFills(ctx, args),
+  },
+  {
+    name: "sera.get_fills_for_order",
+    title: "Fills for one order (API Key)",
+    description:
+      "All fills against a specific order_id with per-fill settlement_economics.",
+    inputSchema: GetFillsForOrderInput,
+    annotations: ANN.read("Get fills for order"),
+    category: "maker",
+    handler: (ctx, args) => getFillsForOrder(ctx, args),
+  },
 ];
 
 /**
@@ -674,5 +802,3 @@ export const TOOLS_BY_CATEGORY: Record<ToolCategory, ToolDef[]> = TOOLS.reduce(
   {} as Record<ToolCategory, ToolDef[]>,
 );
 
-/** Suppress unused import — kept for downstream consumers and JSDoc clarity. */
-export type _Z = z.ZodType;
