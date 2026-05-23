@@ -125,18 +125,24 @@ Quotes are single-use. On `QUOTE_STALE` / 410, re-quote — do not retry the sam
 
 ```
 src/
-├── index.ts                  MCP server entrypoint + tool/resource/prompt registration
+├── index.ts                  Bootstrap entrypoint (stdio transport + lifecycle)
 ├── cli.ts                    `sera` CLI (same handlers as MCP, different transport)
 ├── config.ts                 env loading, hardcoded URL allowlist, AppContext
 ├── resources.ts              MCP resources (sera://...)
 ├── prompts.ts                slash-prompt templates with arg sanitization
+├── server/
+│   └── create-server.ts      McpServer construction + tool/resource/prompt wiring
 ├── sera/
 │   ├── client.ts             REST client + TTL cache wrapper
 │   ├── tokens.ts             token resolver, decimals math
 │   └── types.ts
 ├── signer/signer.ts          EIP-712 signer (external | local | readonly)
 ├── policy/policy.ts          whitelist, caps, presets, dry-run, daily volume gate
-├── tools/                    32 tool handlers across 10 modules
+├── tools/
+│   ├── registry.ts           Single source of truth: name, title, description,
+│   │                         inputSchema, annotations, category, handler
+│   ├── schemas.ts            Zod input schemas
+│   └── ...                   32 tool handlers across 10 modules
 └── util/
     ├── cache.ts              TTL cache + in-flight de-dupe
     ├── env.ts                env parsing helpers
@@ -148,6 +154,62 @@ src/
     ├── sanitize.ts           prompt arg validators
     └── zod-to-json.ts        Zod → MCP JSON Schema bridge
 ```
+
+## Tool registration flow
+
+```
+index.ts
+   │
+   ├── loadConfig()  → AppContext (network, signerMode, policy, etc.)
+   │
+   └── createServer(ctx)        ── src/server/create-server.ts
+          │
+          ├── new McpServer({ name: "sera-mcp", version: "0.5.0" })
+          │
+          ├── for (t of TOOLS):              ── src/tools/registry.ts
+          │     if category === "execution" && !ctx.cfg.enableExecutionTools → skip
+          │     if name === "convert_and_send" && signerMode !== "local"      → skip
+          │     server.registerTool(t.name, { title, description, inputSchema,
+          │                                   annotations }, handler)
+          │
+          ├── server.server.setRequestHandler(ListResources/ReadResource)
+          │     (resources stay on low-level Server — see resources.ts)
+          │
+          └── server.server.setRequestHandler(ListPrompts/GetPrompt)
+                (prompts stay on low-level Server — sanitize.ts validates args
+                 BEFORE LLM substitution, which is the load-bearing security
+                 property)
+```
+
+## Tool annotations
+
+Every tool carries advisory annotations the host runtime can use to decide
+whether to auto-call or require user confirmation:
+
+| Annotation | Tools |
+|---|---|
+| `readOnly: true` | discovery, pricing, liquidity (most), treasury reads, history, admin |
+| `destructive: true` | `execute_swap`, `convert_and_send` |
+| `idempotent: true` | all read-only tools (cache-safe) |
+| `openWorldHint: true` | tools that hit external APIs (almost all) |
+
+See `src/tools/registry.ts` for per-tool assignments and the `ANN` helpers
+that keep the patterns consistent.
+
+## Execution gating
+
+Three layers, each tighter than the last:
+
+1. **`SERA_ENABLE_EXECUTION_TOOLS`** (default `true`). When `false`, the
+   `execution` category is not registered with the host at all — agents
+   running against this MCP cannot see `execute_swap` or `convert_and_send`
+   exist.
+2. **`SERA_SIGNER_MODE`**. `convert_and_send` requires `local`; otherwise
+   self-hides. `execute_swap` works under `external` (caller signs) and
+   `local` (server signs); refuses entirely under `readonly`.
+3. **Policy gates** (`POLICY_PRESET`, `POLICY_DRY_RUN`, daily volume cap,
+   per-tx notional cap, recipient whitelist, symbol whitelist) apply per call
+   inside the handler.
 
 ## Logging
 

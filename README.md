@@ -129,6 +129,7 @@ Override individual fields by setting the matching env (`POLICY_MAX_NOTIONAL_USD
 | Variable | Effect |
 |---|---|
 | `POLICY_DRY_RUN=true` | All `execute_swap` calls refuse, regardless of signer mode. Paper-trading mode. |
+| `SERA_ENABLE_EXECUTION_TOOLS=false` | Hide the `execution` tool category (`execute_swap`, `convert_and_send`) from the MCP host entirely. Default `true`. Set `false` for public / multi-tenant deployments. Other tools (discovery, pricing, liquidity, quote planning, treasury, history) keep working. |
 | `SERA_HISTORY_DB=/path/to/file.db` | Enables `fx_history`, `fx_volatility`, `corridor_pnl`. SQLite log of every fx_rate + quote call this MCP serves. |
 | `LOG_LEVEL` | `trace` \| `debug` \| `info` (default) \| `warn` \| `error`. Structured JSON to stderr. |
 | `SERA_API_KEY` + `SERA_API_SECRET` | Required for `get_balances`, `treasury_value`, `exposure_report`, `rebalance_plan`, `pay_invoice`, `settlement_status`. |
@@ -232,9 +233,12 @@ Honest read of what's hardened vs what's still moving:
 | External signer execution (`execute_swap` with caller signature) | **Stable** | Server holds no key |
 | Local signer execution (`execute_swap` server-signs, `convert_and_send`) | **Operator-managed** | Requires `SERA_SIGNER_MODE=local` + intentionally funded wallet on a trusted host |
 | API-key treasury tools (`get_balances`, `treasury_value`, `pay_invoice`, `settlement_status`) | **Operator-managed** | Require `SERA_API_KEY` / `SERA_API_SECRET` |
-| Streamable HTTP transport | **Planned** | Additive to stdio; not yet implemented |
-| Tool grouping + execution opt-in flag (`SERA_ENABLE_EXECUTION_TOOLS`) | **Planned** | Hardens the read/exec boundary for future remote HTTP exposure |
-| Read/exec endpoint split (`/mcp/read`, `/mcp/exec`) | **Planned** | Lands with Streamable HTTP |
+| Tool annotations (`readOnly` / `destructive` / `idempotent` / `openWorldHint`) | **Stable** (v0.5.0) | Every tool carries annotations the host runtime can use for confirmation UX. |
+| Tool grouping + execution opt-in (`SERA_ENABLE_EXECUTION_TOOLS`) | **Stable** (v0.5.0) | Default `true`; set `false` to hide `execute_swap` + `convert_and_send` entirely. |
+| `convert_and_send` only registered when `SERA_SIGNER_MODE=local` | **Stable** (v0.5.0) | Tool no longer surfaces when it can't work. |
+| Streamable HTTP transport | **Planned** | Additive to stdio; not yet implemented. |
+| Read/exec endpoint split (`/mcp/read`, `/mcp/exec`) | **Planned** | Lands with Streamable HTTP. |
+| Per-tool `outputSchema` + `structuredContent` | **Planned** (v0.5.1) | Machine-readable result shapes for hosts that want to validate or render. |
 
 ## Roadmap
 

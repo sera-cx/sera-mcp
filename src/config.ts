@@ -8,6 +8,14 @@ export interface AppConfig {
   network: "mainnet" | "sepolia";
   baseUrl: string;
   signerMode: SignerMode;
+  /**
+   * When false, the `execution` tool group (execute_swap, convert_and_send)
+   * is NOT registered with the MCP host. Defaults to true to preserve current
+   * behavior; flip to false for public/multi-tenant deployments or any host
+   * where execution should be intentionally hidden behind a separate auth
+   * surface. Set via SERA_ENABLE_EXECUTION_TOOLS.
+   */
+  enableExecutionTools: boolean;
 }
 
 export interface AppContext {
@@ -91,6 +99,17 @@ export function loadConfig(): AppContext {
   }
   const signerMode = signerModeRaw;
 
+  // execution tools opt-out: default true (no behavior change vs older releases).
+  // Public/multi-tenant deployments should set SERA_ENABLE_EXECUTION_TOOLS=false
+  // and instead expose execution via a separate, auth-gated surface.
+  const enableExecutionTools = envBool("SERA_ENABLE_EXECUTION_TOOLS", true);
+  if (!enableExecutionTools) {
+    log.info("execution tools disabled", {
+      reason: "SERA_ENABLE_EXECUTION_TOOLS=false",
+      hidden: ["sera.execute_swap", "sera.convert_and_send"],
+    });
+  }
+
   const sera = new SeraClient({
     baseUrl,
     apiKey: envString("SERA_API_KEY"),
@@ -130,7 +149,7 @@ export function loadConfig(): AppContext {
   const policy = new PolicyEngine(policyCfg, sera);
 
   return {
-    cfg: { network, baseUrl, signerMode },
+    cfg: { network, baseUrl, signerMode, enableExecutionTools },
     sera,
     signer,
     policy,

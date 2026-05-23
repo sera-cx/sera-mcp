@@ -11,18 +11,27 @@ All notable changes to `sera-mcp` are documented in this file. Versions follow [
 - `npm run audit` and `npm run check` scripts.
 - README **Status** section with explicit Stable / Operator-managed / Planned labels per surface.
 - README **Who this is for** line; companion-repo cross-link; deeper-reading pointers.
+- **MCP modernization**: `McpServer` + `registerTool` API across all 32 tools. Every tool now carries `title`, `annotations` (`readOnly` / `destructive` / `idempotent` / `openWorldHint`), and a `category` tag (`discovery` / `pricing` / `liquidity` / `quote_planning` / `treasury` / `history` / `execution`). Host runtimes can now reason about which tools are safe to auto-call vs which need explicit user confirmation.
+  - `convert_and_send` and `execute_swap` are now flagged `destructive: true` at the protocol level.
+- New `src/server/create-server.ts` (server construction) and `src/tools/registry.ts` (single source of truth for tool definitions). `src/index.ts` reduced to bootstrap only.
 
 ### Changed
-- Upgraded `@modelcontextprotocol/sdk` to `^1.18.0` (was `^1.0.4`). Low-level `Server` API still compatible; full `McpServer` + `registerTool` migration planned for v0.6.0.
+- Upgraded `@modelcontextprotocol/sdk` to `^1.18.0` (was `^1.0.4`).
 - Added `overrides` block (`qs ^6.15.2`, `ws ^8.21.0`) to clear moderate audits via the dependency tree.
+- Modularized server build: tool registry split into `src/tools/registry.ts`; server creation into `src/server/create-server.ts`. Behavior unchanged for callers (same tool names, same input schemas, same return shape).
 
 ### Fixed
 - Audit: 0 vulnerabilities (was 3 moderate via `ethers → ws` and `qs`).
 - README: corrected stale "29 tool handlers" → 32.
 
+### Added (also)
+- **`SERA_ENABLE_EXECUTION_TOOLS` env flag** (default `true`). When set to `false`, the `execution` tool category (`execute_swap`, `convert_and_send`) is NOT registered with the MCP host — discovery, pricing, liquidity, quote planning, treasury, and history tools all keep working. Use for public/multi-tenant deployments where execution should be hidden behind a separate auth surface.
+- `convert_and_send` is now only registered when `SERA_SIGNER_MODE=local`. Previously surfaced as a tool that always failed under `external`/`readonly`; now correctly hidden.
+
 ### Notes
-- Tool registration is still on the low-level `Server` API. Migration to `McpServer` + `registerTool` + `annotations` + `outputSchema` is planned for v0.6.0; behavior unchanged in this release.
-- Hand-rolled stdio transport unchanged. Streamable HTTP transport remains on the roadmap, gated on remote-deployment product decisions.
+- `outputSchema` + `structuredContent` are NOT YET added per-tool. Planned for v0.5.1 — adds machine-readable result shapes for hosts that want to validate or render tool output.
+- Streamable HTTP transport remains on the roadmap, gated on remote-deployment product decisions. Stdio behavior is unchanged in this release.
+- **Default behavior is preserved**: `SERA_ENABLE_EXECUTION_TOOLS` defaults to `true`, so existing Claude Code / Desktop / Cursor registrations continue to see all 32 tools (or 31 when running under `external` signer mode, since `convert_and_send` now properly self-hides).
 
 ## [0.4.0] — 2026-05-13
 
