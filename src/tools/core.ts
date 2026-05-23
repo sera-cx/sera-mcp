@@ -168,6 +168,11 @@ export async function getQuote(ctx: AppContext, args: QuoteArgs) {
       route_params,
       fee_breakdown: quote.fee_breakdown,
       expires_at: quote.expires_at,
+      // When non-null, this swap is wallet-funded on an EIP-2612-supported token.
+      // Caller MUST sign permit.eip712 and pass permit_signature + permit_deadline
+      // to execute_swap. Null means either vault-funded or permit-unsupported
+      // token (fall back to approve flow).
+      permit: quote.permit ?? null,
       from: { symbol: fromTok.symbol, address: fromTok.address, decimals: fromTok.decimals },
       to: { symbol: toTok.symbol, address: toTok.address, decimals: toTok.decimals },
       human: {
@@ -195,7 +200,13 @@ export const prepareSwap = getQuote;
 // ---- execute_swap ----
 export async function executeSwap(
   ctx: AppContext,
-  args: { uuid: string; signature?: string; route_params?: Record<string, any> },
+  args: {
+    uuid: string;
+    signature?: string;
+    route_params?: Record<string, any>;
+    permit_signature?: string;
+    permit_deadline?: number;
+  },
 ) {
   // Hard refusal: dry-run mode always wins.
   const dr = ctx.policy.checkDryRun();
@@ -272,8 +283,27 @@ export async function executeSwap(
     signature = signed.signature;
   }
 
+  // Permit fields: forwarded to Sera /swap when caller provides them. Required
+  // (per Sera docs) when the originating /swap/quote returned a non-null `permit`
+  // envelope. We don't validate the permit signature here — Sera will reject if
+  // mismatched and surface ALLOWANCE_INSUFFICIENT.
+  if ((args.permit_signature && args.permit_deadline == null) ||
+      (args.permit_deadline != null && !args.permit_signature)) {
+    throw new Error(
+      "permit_signature and permit_deadline must be provided together (both or neither). " +
+        "Use the deadline from the quote's permit.eip712.message.deadline.",
+    );
+  }
+
   try {
-    const res = await ctx.sera.postSwap({ uuid: args.uuid, signature });
+    const res = await ctx.sera.postSwap({
+      uuid: args.uuid,
+      signature,
+      ...(args.permit_signature ? {
+        permit_signature: args.permit_signature,
+        permit_deadline: args.permit_deadline,
+      } : {}),
+    });
     if (res.success && usdNotional && usdNotional > 0) {
       ctx.policy.recordExecutedNotional(usdNotional);
     }

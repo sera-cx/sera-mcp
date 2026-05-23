@@ -9,12 +9,32 @@ import { isHistoryEnabled } from "../util/persistence.js";
 export async function doctor(ctx: AppContext) {
   const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
 
-  // 1. /health round-trip
+  // 1. /health round-trip — also captures executor_id for the next check
+  let healthExecutorId: number | string | undefined;
   try {
     const h = await ctx.sera.getHealth();
-    checks.push({ name: "sera_health", ok: h.status === "healthy", detail: `status=${h.status}` });
+    healthExecutorId = h.executor_id;
+    checks.push({
+      name: "sera_health",
+      ok: h.status === "healthy",
+      detail: `status=${h.status}${h.executor_id !== undefined ? ` executor_id=${h.executor_id}` : ""}`,
+    });
   } catch (e: any) {
     checks.push({ name: "sera_health", ok: false, detail: e?.message ?? String(e) });
+  }
+
+  // 1b. Executor ID surfaced as its own check — drift invalidates outstanding
+  // signed uuid_int values, so operators want this loud. Mainnet default is 0.
+  if (healthExecutorId !== undefined) {
+    const expected = ctx.cfg.network === "mainnet" ? 0 : healthExecutorId;
+    const ok = Number(healthExecutorId) === Number(expected);
+    checks.push({
+      name: "executor_id",
+      ok,
+      detail: ok
+        ? `executor_id=${healthExecutorId} (matches expected for ${ctx.cfg.network})`
+        : `executor_id=${healthExecutorId} differs from typical mainnet default (0). Any pre-generated uuid_int values that embedded a different executor_id will be rejected. Re-quote.`,
+    });
   }
 
   // 2. /config + network sanity

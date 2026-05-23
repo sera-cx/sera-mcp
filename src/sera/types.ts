@@ -43,6 +43,40 @@ export interface SeraIntent {
   deadline: number;          // uint48
 }
 
+// EIP-2612 Permit envelope returned by /swap/quote when the swap is wallet-funded
+// (initialDepositAmount > 0) and the input token supports permit. POST /swap REQUIRES
+// permit_signature + permit_deadline in this case. If `permit` is null, the token doesn't
+// support permit (fall back to POST /approve) OR the swap is vault-funded (no permit needed).
+export interface PermitEnvelope {
+  permit_supported: boolean;
+  permit_required: boolean;
+  token: string;
+  spender: string;
+  owner: string;
+  value_raw: string;
+  current_allowance_raw: string;
+  nonce: number;
+  suggested_deadline: number;
+  domain: {
+    name: string;
+    version: string;
+    chainId: number;
+    verifyingContract: string;
+  };
+  eip712: {
+    domain: { name: string; version: string; chainId: number; verifyingContract: string };
+    primaryType: "Permit";
+    types: { Permit: Array<{ name: string; type: string }> };
+    message: {
+      owner: string;
+      spender: string;
+      value: string;
+      nonce: number;
+      deadline: number;
+    };
+  };
+}
+
 export interface SwapQuoteResponse {
   uuid: string;
   route_params: SeraIntent;
@@ -51,6 +85,7 @@ export interface SwapQuoteResponse {
     gas_cost_from_token?: string;
   };
   expires_at: number;
+  permit?: PermitEnvelope | null;
   // Sera may include richer route preview / price info; pass through opaque.
   [k: string]: unknown;
 }
@@ -58,6 +93,11 @@ export interface SwapQuoteResponse {
 export interface SwapExecuteRequest {
   uuid: string;
   signature: string;
+  // Required when the originating /swap/quote response carried a non-null `permit`
+  // envelope (wallet-funded swap on EIP-2612-supported token). Sera's POST /swap
+  // rejects the request without these when the quote was issued with permit.
+  permit_signature?: string;
+  permit_deadline?: number;
 }
 
 export interface SwapExecuteResponse {

@@ -26,6 +26,19 @@ const TTL_CONFIG_MS = 60 * 60_000;
 const TTL_SYSTIME_MS = 5_000;
 const TTL_FX_MS = 60_000;
 
+// Retry-After handling for transient 503s. Per Sera docs, "Server failures
+// (5xx) mapped to 503 with Retry-After: 1 header". Only safe for GET (read
+// idempotent); POST mutations never auto-retry (could double-execute).
+const MAX_RETRIES_GET = 2;
+const RETRY_AFTER_FALLBACK_MS = 1_000;
+const RETRY_AFTER_CAP_MS = 5_000;
+
+// Read endpoints expect lowercase owner_address (per docs). EIP-712 signed
+// payloads accept EIP-55 checksum. Normalize at the read boundary.
+export function lowerOwner(addr: string): string {
+  return addr.toLowerCase();
+}
+
 export class SeraApiError extends Error {
   constructor(
     public status: number,
@@ -72,43 +85,66 @@ export class SeraClient {
       accept: "application/json",
       ...(init.auth ? this.authHeader : {}),
     };
-    const res = await request(url, {
-      method,
-      headers,
-      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-      // Refuse redirects entirely. The base URL is allowlisted; a 30x to
-      // anywhere else (including a sera.cx subdomain) would defeat that gate.
-      maxRedirections: 0,
-    });
-    const text = await res.body.text();
-    let parsed: unknown = undefined;
-    try {
-      parsed = text ? JSON.parse(text) : undefined;
-    } catch {
-      parsed = text;
-    }
-    if (res.statusCode >= 400) {
-      // Sera observed shapes:
-      //   { detail: "Invalid request" }
-      //   { detail: { detail: "...", error_code: "..." } }
-      //   { detail: { success: false, error: "no_liquidity" } }   // /swap/quote business errors
-      const detail = (parsed as any)?.detail;
-      let errorCode: string | undefined;
-      let message: string;
-      if (typeof detail === "string") {
-        message = detail;
-      } else if (detail && typeof detail === "object") {
-        errorCode = (detail.error_code as string | undefined) ?? (detail.error as string | undefined);
-        message =
-          (detail.detail as string | undefined) ??
-          (detail.error as string | undefined) ??
-          `Sera ${res.statusCode} ${method} ${path}`;
-      } else {
-        message = `Sera ${res.statusCode} ${method} ${path}`;
+
+    const maxAttempts = method === "GET" ? 1 + MAX_RETRIES_GET : 1;
+    let attempt = 0;
+    let lastErr: unknown;
+
+    while (attempt < maxAttempts) {
+      attempt++;
+      const res = await request(url, {
+        method,
+        headers,
+        body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+        // Refuse redirects entirely. The base URL is allowlisted; a 30x to
+        // anywhere else (including a sera.cx subdomain) would defeat that gate.
+        maxRedirections: 0,
+      });
+      const text = await res.body.text();
+      let parsed: unknown = undefined;
+      try {
+        parsed = text ? JSON.parse(text) : undefined;
+      } catch {
+        parsed = text;
       }
-      throw new SeraApiError(res.statusCode, errorCode, message, parsed);
+
+      // Honor Retry-After on 503 for read-only methods. Per Sera docs all
+      // 5xx are mapped to 503 with Retry-After: 1. POSTs are never retried —
+      // a transient 503 mid-execute could land server-side after we time out
+      // locally; auto-retrying would double-execute.
+      if (res.statusCode === 503 && method === "GET" && attempt < maxAttempts) {
+        const retryAfter = res.headers["retry-after"];
+        const waitMs = parseRetryAfter(retryAfter);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+
+      if (res.statusCode >= 400) {
+        // Sera observed shapes:
+        //   { detail: "Invalid request" }
+        //   { detail: { detail: "...", error_code: "..." } }
+        //   { detail: { success: false, error: "no_liquidity" } }   // /swap/quote business errors
+        const detail = (parsed as any)?.detail;
+        let errorCode: string | undefined;
+        let message: string;
+        if (typeof detail === "string") {
+          message = detail;
+        } else if (detail && typeof detail === "object") {
+          errorCode = (detail.error_code as string | undefined) ?? (detail.error as string | undefined);
+          message =
+            (detail.detail as string | undefined) ??
+            (detail.error as string | undefined) ??
+            `Sera ${res.statusCode} ${method} ${path}`;
+        } else {
+          message = `Sera ${res.statusCode} ${method} ${path}`;
+        }
+        lastErr = new SeraApiError(res.statusCode, errorCode, message, parsed);
+        throw lastErr;
+      }
+      return parsed as T;
     }
-    return parsed as T;
+    // Exhausted GET retries on 503.
+    throw lastErr ?? new SeraApiError(503, undefined, `Sera ${method} ${path} exhausted retries`, undefined);
   }
 
   // ---- Public / unauthenticated (cached) ----
@@ -155,19 +191,44 @@ export class SeraClient {
   }
 
   // ---- API-key-authenticated reads ----
+  // owner_address normalized to lowercase per Sera docs ("Read endpoints
+  // treat owner_address as case-sensitive; use lowercase form"). EIP-712
+  // signed payloads accept EIP-55 checksum and are NOT normalized here.
   async getBalances(ownerAddress: string): Promise<BalancesResponse> {
     return this.call("GET", "/balances", {
-      query: { owner_address: ownerAddress },
+      query: { owner_address: lowerOwner(ownerAddress) },
       auth: true,
     });
   }
 
   /**
    * Order/trade history. Sera returns 401 without auth — surface a clear gate
-   * upstream when SERA_API_KEY is missing. Filter shape is unverified across
-   * Sera versions; pass through whatever the caller provides.
+   * upstream when SERA_API_KEY is missing. owner_address (if present in
+   * filters) lowercased automatically.
    */
   async getOrders(filters: Record<string, string | number | undefined> = {}): Promise<unknown> {
-    return this.call("GET", "/orders", { query: filters, auth: true });
+    const q = { ...filters };
+    if (typeof q.owner_address === "string") q.owner_address = lowerOwner(q.owner_address);
+    return this.call("GET", "/orders", { query: q, auth: true });
   }
+}
+
+/**
+ * Parse HTTP Retry-After header. Accepts seconds (integer) or HTTP-date.
+ * Falls back to RETRY_AFTER_FALLBACK_MS, caps at RETRY_AFTER_CAP_MS to
+ * prevent a hostile/buggy upstream from pinning us indefinitely.
+ */
+function parseRetryAfter(header: string | string[] | undefined): number {
+  if (!header) return RETRY_AFTER_FALLBACK_MS;
+  const value = Array.isArray(header) ? header[0] : header;
+  const asInt = Number.parseInt(value, 10);
+  if (Number.isFinite(asInt) && asInt >= 0) {
+    return Math.min(asInt * 1_000, RETRY_AFTER_CAP_MS);
+  }
+  const asDate = Date.parse(value);
+  if (Number.isFinite(asDate)) {
+    const ms = asDate - Date.now();
+    if (ms > 0) return Math.min(ms, RETRY_AFTER_CAP_MS);
+  }
+  return RETRY_AFTER_FALLBACK_MS;
 }

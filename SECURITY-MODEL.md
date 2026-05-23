@@ -179,7 +179,7 @@ Tracked publicly so deployers can see what's open. See `git log` for the latest 
 | Finding | Status |
 |---|---|
 | Base URL allowlist (must hardcode by network) | Closed (v0.3.2) |
-| Bearer-token concat at Sera REST | Open (Sera-side spec issue, escalated upstream) |
+| Bearer-token concat at Sera REST | Documented Sera spec (`Authorization: Bearer {api_key}:{api_secret}`). Non-standard for Bearer (conventionally opaque), but intentional per docs.sera.cx — not a misuse, just unusual. |
 | Quote uuid binding (refuse mismatched route_params) | Closed (v0.3.1) |
 | Daily volume cap derivation (server-side) | Closed (v0.3.1) |
 | Slippage clamp (defense-in-depth bound) | Open (hygiene) |

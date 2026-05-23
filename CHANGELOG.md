@@ -2,6 +2,24 @@
 
 All notable changes to `sera-mcp` are documented in this file. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] — 2026-05-24
+
+### Fixed (correctness)
+- **`execute_swap` now accepts `permit_signature` + `permit_deadline`.** When `/swap/quote` returns a non-null `permit` envelope (wallet-funded swap on EIP-2612-supported token), Sera's `POST /swap` requires these fields. Previously sera-mcp dropped them, causing wallet-funded permit-token swaps to fail with `ALLOWANCE_INSUFFICIENT`. Vault-funded swaps were unaffected.
+- **`get_quote` now surfaces the `permit` envelope** in its response. Callers can sign `permit.eip712` and pass `permit_signature` + `permit_deadline` to `execute_swap`. Null permit = either vault-funded or permit-unsupported token (use approve flow).
+- **`owner_address` is now lowercased on read endpoints** (`/balances`, `/orders`). Sera docs: "Read endpoints treat `owner_address` as case-sensitive; use lowercase form." EIP-712 signed payloads still accept EIP-55 checksum. Previously checksummed addresses passed to `get_balances` could 4xx.
+- **HTTP client honors `Retry-After` on 503 for GET requests** (max 2 retries, cap 5s). Per Sera docs, "Server failures (5xx) mapped to 503 with Retry-After: 1 header." POSTs are never auto-retried (could double-execute). Transient Sera blips no longer hard-fail reads.
+
+### Added
+- `doctor` now surfaces `executor_id` from `/health` as its own check. Mainnet default is `0`; drift invalidates outstanding signed `uuid_int` values.
+
+### Docs
+- `PolicyConfig` JSDoc now explicitly distinguishes conventional bps (denom 10⁴, used by `outputToleranceBps`) from Sera's contract `BPS_DENOMINATOR` (10¹⁴, used by `Order.feeBps` once maker tools land in v0.7.0).
+- `SECURITY-MODEL.md` audit finding #2 (Bearer concat) status changed from "Open (Sera-side spec issue, escalated upstream)" to "Documented Sera spec — non-standard for Bearer but intentional per docs.sera.cx".
+
+### Notes
+- No tool-surface change for current users beyond the new optional permit fields. All 32 tools work identically when `permit_signature` is unset.
+
 ## [0.5.0] — 2026-05-24
 
 ### Added

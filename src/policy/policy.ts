@@ -2,6 +2,20 @@ import type { SeraClient } from "../sera/client.js";
 import type { SeraToken } from "../sera/types.js";
 import { recordExecutedNotional, rolling24hVolumeUsd } from "../util/persistence.js";
 
+/**
+ * Policy config — all `*Bps` fields here use CONVENTIONAL basis points
+ * (denominator 10,000), NOT Sera's contract-level `BPS_DENOMINATOR` (10^14).
+ *
+ *   conventional bps:     1 bps = 1/10,000     = 0.01%        ← USED HERE
+ *   Sera contract bps:    1 bps = 1/10^14      = far smaller  ← USED IN Order.feeBps
+ *
+ * The two are intentionally distinct. The MCP exposes a user-facing knob in
+ * conventional bps (because operators reason in 0.10% terms). Sera-side fee
+ * math on Orders uses the contract denominator and is computed by Sera, not
+ * by this client. If we ever submit Order structs ourselves (maker tools),
+ * the `feeBps` field on those Orders is contract-denominator and must be
+ * converted accordingly.
+ */
 export interface PolicyConfig {
   allowedSymbols: string[];          // empty = allow all
   allowedRecipients: string[];       // empty = allow any (lowercased addresses)
@@ -9,7 +23,7 @@ export interface PolicyConfig {
   dailyVolumeCapUsd: number;         // 0 = no cap (rolling 24h)
   defaultExpirationSeconds: number;
   maxExpirationSeconds: number;      // hard ceiling on caller-requested expiration
-  outputToleranceBps: number;        // bps to LOWER minOutputAmount (was confusingly extraSlippageBps)
+  outputToleranceBps: number;        // CONVENTIONAL bps to LOWER minOutputAmount (0–500, i.e. 0–5%)
   dryRun: boolean;                   // true = refuse all execute calls regardless of signer mode
   historyHashOwner: boolean;         // true = SHA-256 owner_address before logging (privacy)
   persistentDailyVolume: boolean;    // true = persist volume to SQLite (cross-restart enforcement)

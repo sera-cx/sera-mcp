@@ -1,6 +1,6 @@
 {
   "name": "sera-mcp",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Multi-currency MCP server backed by Sera (stablecoin FX). Lets any agent discover currencies, quote, route, and execute stablecoin swaps through one standard tool interface.",
   "type": "module",
   "bin": {

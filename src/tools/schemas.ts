@@ -81,6 +81,19 @@ export const ExecuteSwapInput = z.object({
       "Optional. If provided, must EXACTLY match what this MCP returned for the uuid (refused on mismatch). " +
         "In external mode the upstream signature is the security boundary; in local mode the server-side registry binding is enforced.",
     ),
+  permit_signature: HexSignature
+    .optional()
+    .describe(
+      "EIP-2612 permit signature. REQUIRED when the originating get_quote response carried a non-null `permit` envelope (wallet-funded swap on EIP-2612-supported token). Sign `quote.permit.eip712` under that token's domain. Sera POST /swap rejects without this when the quote was issued with permit.",
+    ),
+  permit_deadline: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      "EIP-2612 permit deadline (unix seconds). Must equal `quote.permit.eip712.message.deadline`. Required iff permit_signature is provided.",
+    ),
 });
 
 export const ConvertAndSendInput = z.object({
