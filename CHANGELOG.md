@@ -2,6 +2,41 @@
 
 All notable changes to `sera-mcp` are documented in this file. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] — 2026-05-24
+
+### Added — 11 new tools (32 → 42 total)
+
+**Account / funds (5 destructive tools, all API-Key gated):**
+- `sera.build_approve` — build unsigned ERC-20 `approve()` tx (sign locally, broadcast via `send_tx`).
+- `sera.build_deposit` — build vault deposit tx, optionally with EIP-2612 permit (combines approve+deposit in one tx).
+- `sera.build_transfer` — build unsigned ERC-20 `transfer()`.
+- `sera.send_tx` — broadcast a locally-signed approve/deposit raw_tx.
+- `sera.send_transfer` — broadcast a locally-signed transfer raw_tx.
+
+**Withdraw (3 tools — 4-step dual-sig flow):**
+- `sera.withdraw_request` — step 1: user signs `WithdrawIntent`; this returns the executor co-signature.
+- `sera.withdraw_build` — step 2: returns the unsigned `executeInstantWithdrawDualSig` tx given both signatures.
+- `sera.withdraw_send` — step 4: broadcast the locally-signed raw_tx (step 3 is the user signing locally).
+
+**Debugging / helpers (3 tools):**
+- `sera.batch_quote` — wraps `POST /swap/quote/batch` (up to 50 quotes per round-trip). Replaces client-side fan-out for `scan_markets` / `find_deals` workflows. Per-item errors surface inline without failing the batch.
+- `sera.verify_signature` — wraps `POST /verify-signature`. Test an EIP-712 signature without burning a quote.
+- `sera.permit_metadata` — wraps `GET /permit/metadata`. Returns whether a token supports EIP-2612 + nonce + current allowance.
+
+### Added — new tool categories
+`account`, `withdraw`, `debugging` join the existing 7 categories. The `execution` opt-in gate (`SERA_ENABLE_EXECUTION_TOOLS`) does NOT cover account or withdraw — those have their own signer/auth requirements at the call boundary.
+
+### Added — SeraClient methods
+`postSwapQuoteBatch`, `verifySignature`, `getPermitMetadata`, `buildApprove`, `buildDeposit`, `buildTransfer`, `sendTx`, `sendTransfer`, `withdrawRequest`, `withdrawBuild`, `withdrawSend`. Plus typed response shapes (`BuildTxResponse`, `TxSendResponse`, `WithdrawCosignResponse`, `VerifySignatureResponse`, `PermitMetadataResponse`, `BatchQuoteResponse`) in `src/sera/types.ts`.
+
+### Added — `SeraConfig` typed fields
+`domain_separator`, `eip712_domain`, `limits.vl_batch` now typed (was `[k: string]: unknown` pass-through).
+
+### Notes
+- All tx builders are API-Key gated. The matching `send_*` tools are flagged `destructive: true` and require API Key.
+- Withdraw step 1 (`withdraw_request`) and step 2 (`withdraw_build`) can run without an API Key (intent + sig is the auth); step 4 (`withdraw_send`) likewise.
+- 81 tests still pass after the additions. No new test coverage on the new tools yet — Sprint 1B+ would extend it.
+
 ## [0.5.2] — 2026-05-24
 
 ### Added

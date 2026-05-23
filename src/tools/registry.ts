@@ -17,6 +17,10 @@ import { z, type ZodTypeAny } from "zod";
 import type { AppContext } from "../config.js";
 
 import {
+  BatchQuoteInput,
+  BuildApproveInput,
+  BuildDepositInput,
+  BuildTransferInput,
   CompareCorridorsInput,
   CompareToExternalFxInput,
   ConvertAndSendInput,
@@ -38,15 +42,22 @@ import {
   MarketHealthInput,
   MultiSourceMidInput,
   PayInvoiceInput,
+  PermitMetadataInput,
   PrepareSwapInput,
   ProbeDepthInput,
   QuoteRecipientAmountInput,
   RebalancePlanInput,
   RoundTripCostInput,
   ScanMarketsInput,
+  SendTransferInput,
+  SendTxInput,
   SettlementStatusInput,
   SpreadRadarInput,
   TreasuryValueInput,
+  VerifySignatureInput,
+  WithdrawBuildInput,
+  WithdrawRequestInput,
+  WithdrawSendInput,
 } from "./schemas.js";
 
 import {
@@ -84,6 +95,17 @@ import {
   fxQuoteDiff,
   compareCorridors,
 } from "./health_corridors.js";
+import {
+  buildApprove,
+  buildDeposit,
+  buildTransfer,
+  sendTx,
+  sendTransfer,
+  withdrawRequest,
+  withdrawBuild,
+  withdrawSend,
+} from "./account.js";
+import { batchQuote, verifySignature, permitMetadata } from "./helpers.js";
 
 /**
  * Tool capability group. Drives future read/exec server split and the
@@ -106,7 +128,10 @@ export type ToolCategory =
   | "quote_planning"
   | "treasury"
   | "history"
-  | "execution";
+  | "execution"
+  | "account"        // tx builders + broadcast helpers
+  | "withdraw"       // dual-sig 4-step withdraw
+  | "debugging";     // verify_signature, permit_metadata
 
 /**
  * MCP tool annotations carried into registerTool().
@@ -511,6 +536,129 @@ export const TOOLS: ToolDef[] = [
     annotations: ANN.destructive("Convert and send"),
     category: "execution",
     handler: (ctx, args) => convertAndSend(ctx, args),
+  },
+
+  // ──────────────────────────────────────────────────────────────── account
+  // tx builders return unsigned EIP-1559 transactions; the matching send_*
+  // tool broadcasts the locally-signed raw_tx.
+  {
+    name: "sera.build_approve",
+    title: "Build ERC-20 approve tx",
+    description:
+      "Build an unsigned EIP-1559 ERC-20 approve() transaction. Returns `tx` object — sign locally with the owner wallet, then broadcast via sera.send_tx. `spender` must be the live vault_address or sor_address (read from sera://config). Requires SERA_API_KEY.",
+    inputSchema: BuildApproveInput,
+    annotations: ANN.read("Build approve"),
+    category: "account",
+    handler: (ctx, args) => buildApprove(ctx, args),
+  },
+  {
+    name: "sera.build_deposit",
+    title: "Build vault deposit tx (optionally with EIP-2612 permit)",
+    description:
+      "Build an unsigned deposit transaction. Omit permit_* fields for the standard depositFund flow (requires prior approve); include them to combine approval + deposit via depositFundWithPermit in one tx. Returns `tx` — sign locally, broadcast via sera.send_tx. Requires SERA_API_KEY.",
+    inputSchema: BuildDepositInput,
+    annotations: ANN.read("Build deposit"),
+    category: "account",
+    handler: (ctx, args) => buildDeposit(ctx, args),
+  },
+  {
+    name: "sera.build_transfer",
+    title: "Build ERC-20 transfer tx",
+    description:
+      "Build an unsigned ERC-20 transfer() transaction. Returns `tx` — sign locally, broadcast via sera.send_transfer. Requires SERA_API_KEY.",
+    inputSchema: BuildTransferInput,
+    annotations: ANN.read("Build transfer"),
+    category: "account",
+    handler: (ctx, args) => buildTransfer(ctx, args),
+  },
+  {
+    name: "sera.send_tx",
+    title: "Broadcast signed approve/deposit tx (DESTRUCTIVE)",
+    description:
+      "Broadcast a locally-signed raw_tx returned from sera.build_approve or sera.build_deposit. Sera validates the selector-to-target pairing; transfers go through sera.send_transfer instead. Returns `tx_hash`. Requires SERA_API_KEY.",
+    inputSchema: SendTxInput,
+    annotations: ANN.destructive("Send tx"),
+    category: "account",
+    handler: (ctx, args) => sendTx(ctx, args),
+  },
+  {
+    name: "sera.send_transfer",
+    title: "Broadcast signed transfer tx (DESTRUCTIVE)",
+    description:
+      "Broadcast a locally-signed raw_tx returned from sera.build_transfer. Returns `tx_hash`. Requires SERA_API_KEY.",
+    inputSchema: SendTransferInput,
+    annotations: ANN.destructive("Send transfer"),
+    category: "account",
+    handler: (ctx, args) => sendTransfer(ctx, args),
+  },
+
+  // ─────────────────────────────────────────────────────── withdraw (dual-sig)
+  // 4-step flow:
+  //   1. sera.withdraw_request — user signs WithdrawIntent; executor co-signs.
+  //   2. sera.withdraw_build   — server builds unsigned tx with both sigs.
+  //   3. (off-server) user signs the tx locally.
+  //   4. sera.withdraw_send    — broadcast.
+  {
+    name: "sera.withdraw_request",
+    title: "Withdraw step 1: request executor co-signature",
+    description:
+      "Step 1 of the dual-signature instant-withdrawal flow. User pre-signs a WithdrawIntent under the Sera EIP-712 domain; this endpoint returns the executor co-signature. Continue to sera.withdraw_build with both signatures.",
+    inputSchema: WithdrawRequestInput,
+    annotations: ANN.read("Withdraw cosign"),
+    category: "withdraw",
+    handler: (ctx, args) => withdrawRequest(ctx, args),
+  },
+  {
+    name: "sera.withdraw_build",
+    title: "Withdraw step 2: build unsigned tx",
+    description:
+      "Step 2 of dual-sig withdraw. Given the WithdrawIntent + user signature + executor co-signature, returns the unsigned executeInstantWithdrawDualSig transaction. Sign locally; broadcast via sera.withdraw_send.",
+    inputSchema: WithdrawBuildInput,
+    annotations: ANN.read("Withdraw build"),
+    category: "withdraw",
+    handler: (ctx, args) => withdrawBuild(ctx, args),
+  },
+  {
+    name: "sera.withdraw_send",
+    title: "Withdraw step 4: broadcast signed tx (DESTRUCTIVE)",
+    description:
+      "Step 4 of dual-sig withdraw. Broadcast the locally-signed executeInstantWithdrawDualSig raw_tx. Sera validates selector-to-target pairing; only accepts calls targeting the live Sera contract.",
+    inputSchema: WithdrawSendInput,
+    annotations: ANN.destructive("Withdraw send"),
+    category: "withdraw",
+    handler: (ctx, args) => withdrawSend(ctx, args),
+  },
+
+  // ────────────────────────────────────────────────────────────── debugging
+  {
+    name: "sera.batch_quote",
+    title: "Batch swap quotes (up to 50 in one round-trip)",
+    description:
+      "Replaces client-side fan-out with Sera's POST /swap/quote/batch. Submit 1–50 quote requests at once; each gets its own uuid and signed Intent. Per-item errors surface as { ok:false, error:{...} } without failing the batch. Useful for makers pricing many pairs.",
+    inputSchema: BatchQuoteInput,
+    annotations: ANN.quote("Batch quote"),
+    category: "quote_planning",
+    handler: (ctx, args) => batchQuote(ctx, args),
+  },
+  {
+    name: "sera.verify_signature",
+    title: "Test EIP-712 signature without placing an order",
+    description:
+      "Round-trips a signed payload through Sera's /verify-signature endpoint. Useful for diagnosing wallet-side signing issues (wrong domain, malformed typed-data, mismatched uuid_int) before burning a quote on a failed POST /orders.",
+    inputSchema: VerifySignatureInput,
+    annotations: ANN.read("Verify signature"),
+    category: "debugging",
+    handler: (ctx, args) => verifySignature(ctx, args as Record<string, unknown>),
+  },
+  {
+    name: "sera.permit_metadata",
+    title: "Check EIP-2612 permit support for a token",
+    description:
+      "Returns whether the token supports EIP-2612 (`permit_supported`), the current allowance for owner→spender, and — if supported — the EIP-2612 domain + next nonce. Use to decide between sera.build_approve (no-permit) and sera.build_deposit with permit_signature.",
+    inputSchema: PermitMetadataInput,
+    annotations: ANN.read("Permit metadata"),
+    category: "debugging",
+    handler: (ctx, args) => permitMetadata(ctx, args),
   },
 ];
 

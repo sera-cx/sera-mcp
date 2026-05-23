@@ -1,7 +1,10 @@
 import { request } from "undici";
 import type {
   BalancesResponse,
+  BatchQuoteResponse,
+  BuildTxResponse,
   FxRateResponse,
+  PermitMetadataResponse,
   SeraConfig,
   SeraMarket,
   SeraToken,
@@ -9,6 +12,9 @@ import type {
   SwapExecuteResponse,
   SwapQuoteRequest,
   SwapQuoteResponse,
+  TxSendResponse,
+  VerifySignatureResponse,
+  WithdrawCosignResponse,
 } from "./types.js";
 import { TtlCache } from "../util/cache.js";
 import { recordFx } from "../util/persistence.js";
@@ -210,6 +216,119 @@ export class SeraClient {
     const q = { ...filters };
     if (typeof q.owner_address === "string") q.owner_address = lowerOwner(q.owner_address);
     return this.call("GET", "/orders", { query: q, auth: true });
+  }
+
+  // ---- Batch quote (no auth) ----
+  async postSwapQuoteBatch(quotes: SwapQuoteRequest[]): Promise<BatchQuoteResponse> {
+    return this.call("POST", "/swap/quote/batch", { body: { quotes } });
+  }
+
+  // ---- Signature debugging (no auth) ----
+  async verifySignature(payload: Record<string, unknown>): Promise<VerifySignatureResponse> {
+    return this.call("POST", "/verify-signature", { body: payload });
+  }
+
+  // ---- Permit metadata (API Key) ----
+  async getPermitMetadata(args: {
+    token: string;
+    owner: string;
+    spender: string;
+    amount?: string;
+  }): Promise<PermitMetadataResponse> {
+    return this.call("GET", "/permit/metadata", {
+      query: {
+        token: args.token,
+        owner: lowerOwner(args.owner),
+        spender: args.spender,
+        amount: args.amount,
+      },
+      auth: true,
+    });
+  }
+
+  // ---- Account flow — tx builders (API Key) ----
+  async buildApprove(args: {
+    token: string;
+    owner: string;
+    spender: string;
+    amount: string;
+  }): Promise<BuildTxResponse> {
+    return this.call("POST", "/approve", {
+      body: { ...args, owner: lowerOwner(args.owner) },
+      auth: true,
+    });
+  }
+
+  async buildDeposit(args: {
+    token: string;
+    owner: string;
+    amount: string;
+    permit_signature?: string;
+    permit_deadline?: number;
+    permit_amount?: string;
+  }): Promise<BuildTxResponse> {
+    return this.call("POST", "/deposit", {
+      body: { ...args, owner: lowerOwner(args.owner) },
+      auth: true,
+    });
+  }
+
+  async buildTransfer(args: {
+    token: string;
+    to: string;
+    amount: string;
+    from_address: string;
+  }): Promise<BuildTxResponse> {
+    return this.call("POST", "/transfer", {
+      body: { ...args, from_address: lowerOwner(args.from_address) },
+      auth: true,
+    });
+  }
+
+  async sendTx(rawTx: string): Promise<TxSendResponse> {
+    return this.call("POST", "/tx/send", { body: { raw_tx: rawTx }, auth: true });
+  }
+
+  async sendTransfer(rawTx: string): Promise<TxSendResponse> {
+    return this.call("POST", "/transfer/send", { body: { raw_tx: rawTx }, auth: true });
+  }
+
+  // ---- Withdraw — 4-step dual-sig flow ----
+  // Step 1: user signs WithdrawIntent → executor co-signs.
+  async withdrawRequest(payload: {
+    intent: {
+      user: string;
+      tokens: string[];
+      amounts: string[];
+      recipient: string;
+      deadline: string;
+      uuid: string;
+    };
+    user_signature: string;
+  }): Promise<WithdrawCosignResponse> {
+    return this.call("POST", "/withdraw", { body: payload });
+  }
+
+  // Step 2: build the unsigned tx given both signatures.
+  async withdrawBuild(payload: {
+    intent: {
+      user: string;
+      tokens: string[];
+      amounts: string[];
+      recipient: string;
+      deadline: string;
+      uuid: string;
+    };
+    user_signature: string;
+    executor: string;
+    executor_signature: string;
+  }): Promise<BuildTxResponse> {
+    return this.call("POST", "/withdraw/build", { body: payload });
+  }
+
+  // Step 4: broadcast the locally-signed tx.
+  async withdrawSend(rawTx: string): Promise<TxSendResponse> {
+    return this.call("POST", "/withdraw/send", { body: { raw_tx: rawTx } });
   }
 }
 

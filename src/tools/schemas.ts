@@ -348,3 +348,116 @@ export const SpreadRadarInput = z.object({
     .optional()
     .describe("Set false to skip triangular checks (cheaper, only n*(n-1) calls). Default true."),
 });
+
+// ──────────────────────────────────────────────────────── account / funds flow
+// All `build*` tools return an unsigned EIP-1559 transaction object the caller
+// must sign locally and broadcast via the paired `send_*` tool (or any other
+// RPC). Tx-building helpers all require API Key auth.
+
+const RawTxHex = z.string().regex(/^0x[0-9a-fA-F]+$/, "must be 0x-prefixed hex raw tx").min(4).max(20_000);
+const Uint256Decimal = z.string().regex(/^\d+$/, "must be a uint256 decimal string");
+
+export const BuildApproveInput = z.object({
+  token: EvmAddress.describe("ERC-20 token address."),
+  owner: EvmAddress.describe("Owner wallet (must match the authenticated API-key owner)."),
+  spender: EvmAddress.describe("Allowance target. Must be the live Vault or SOR address from sera://config / GET /config."),
+  amount: Uint256Decimal.describe("Raw uint256 allowance amount (token base units)."),
+});
+
+export const BuildDepositInput = z.object({
+  token: EvmAddress,
+  owner: EvmAddress,
+  amount: Uint256Decimal.describe("Raw uint256 deposit amount."),
+  permit_signature: HexSignature.optional().describe("Optional EIP-2612 permit signature — if present, deposit + permit combined in one tx (depositFundWithPermit)."),
+  permit_deadline: z.number().int().positive().optional(),
+  permit_amount: Uint256Decimal.optional().describe("Permit allowance amount (defaults to `amount` when omitted)."),
+});
+
+export const BuildTransferInput = z.object({
+  token: EvmAddress,
+  to: EvmAddress.describe("Recipient address."),
+  amount: Uint256Decimal,
+  from_address: EvmAddress.describe("Sender wallet."),
+});
+
+export const SendTxInput = z.object({
+  raw_tx: RawTxHex.describe("Locally-signed raw transaction hex. Returned from approve/deposit/transfer build calls."),
+});
+
+export const SendTransferInput = z.object({
+  raw_tx: RawTxHex,
+});
+
+// ──────────────────────────────────────────────────────── withdraw (dual-sig)
+// Withdraw is a 4-step flow:
+//   1. withdraw_request — user signs WithdrawIntent; executor co-signs.
+//   2. withdraw_build   — server builds unsigned tx given both signatures.
+//   3. (off-server) user signs the unsigned tx locally.
+//   4. withdraw_send    — broadcast.
+
+const WithdrawIntentSchema = z.object({
+  user: EvmAddress,
+  tokens: z.array(EvmAddress).min(1).max(20).describe("1–20 token addresses to withdraw."),
+  amounts: z.array(Uint256Decimal).min(1).max(20).describe("Per-token raw uint256 amounts. Length must match tokens[]."),
+  recipient: EvmAddress.describe("Destination wallet."),
+  deadline: z.string().regex(/^\d+$/, "uint256 unix seconds").describe("Unix timestamp deadline. Must be future and ≤365d − 300s out."),
+  uuid: z.string().regex(/^\d+$/, "uint256 decimal").describe("Replay-protection identifier."),
+});
+
+export const WithdrawRequestInput = z.object({
+  intent: WithdrawIntentSchema,
+  user_signature: HexSignature.describe("EIP-712 signature over the WithdrawIntent struct under the Sera domain."),
+});
+
+export const WithdrawBuildInput = z.object({
+  intent: WithdrawIntentSchema,
+  user_signature: HexSignature,
+  executor: EvmAddress.describe("Co-signing executor address from withdraw_request response."),
+  executor_signature: HexSignature,
+});
+
+export const WithdrawSendInput = z.object({
+  raw_tx: RawTxHex,
+});
+
+// ──────────────────────────────────────────────────────── batch quote
+export const BatchQuoteInput = z.object({
+  quotes: z
+    .array(
+      z.object({
+        from: CurrencyRef,
+        to: CurrencyRef,
+        amount: DecimalAmount,
+        owner_address: EvmAddress.optional(),
+        recipient: EvmAddress.optional(),
+        gas_mode: z.enum(["receive_less", "pay_more"]).default("receive_less"),
+        expiration_seconds: z.number().int().positive().optional(),
+        simulate: z.boolean().optional(),
+      }),
+    )
+    .min(1)
+    .max(50)
+    .describe("1–50 quote requests in a single round-trip. Mirrors POST /swap/quote/batch."),
+});
+
+// ──────────────────────────────────────────────────────── verify signature
+export const VerifySignatureInput = z.object({
+  owner_address: EvmAddress,
+  side: z.enum(["bid", "ask"]),
+  amount: DecimalAmount,
+  price: DecimalAmount,
+  from_address: EvmAddress.describe("Market base token address."),
+  to_address: EvmAddress.describe("Market quote token address."),
+  order_id: Uuid,
+  uuid_int: z.string().regex(/^\d+$/, "uint256 decimal"),
+  signature: HexSignature,
+  expiration: z.number().int().positive(),
+});
+
+// ──────────────────────────────────────────────────────── permit metadata
+export const PermitMetadataInput = z.object({
+  token: EvmAddress.describe("ERC-20 token to check for EIP-2612 support."),
+  owner: EvmAddress.describe("Wallet that may sign permit."),
+  spender: EvmAddress.describe("Allowance target — typically vault_address or sor_address (from sera://config)."),
+  amount: Uint256Decimal.optional().describe("Raw amount to compare against current allowance. When set, response includes `required: bool`."),
+});

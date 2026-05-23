@@ -132,7 +132,83 @@ export interface SeraConfig {
   sera_address: string;
   vault_address: string;
   sor_address: string;
+  domain_separator?: string;
+  eip712_domain?: {
+    name: string;
+    version: string;
+    chainId: number;
+    verifyingContract: string;
+  };
+  limits?: {
+    vl_batch?: { min: number; max: number };
+  };
   [k: string]: unknown;
+}
+
+// Unsigned EIP-1559 transaction shape returned by /approve, /deposit,
+// /withdraw/build, /transfer.
+export interface UnsignedTx {
+  to: string;
+  data: string;
+  value: string;
+  chainId: string;
+  nonce: string;
+  gas: string;
+  type: string;
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+}
+
+export interface BuildTxResponse {
+  tx: UnsignedTx;
+}
+
+export interface TxSendResponse {
+  tx_hash: string;
+}
+
+// Withdraw step 1 response (executor co-signature).
+export interface WithdrawCosignResponse {
+  success: boolean;
+  executor_address: string;
+  executor_signature: string;
+  error: string | null;
+}
+
+// Verify-signature endpoint shape.
+export interface VerifySignatureResponse {
+  valid: boolean;
+  recovered_address: string;
+  expected_address: string;
+  error: string | null;
+}
+
+// Permit metadata.
+export interface PermitMetadataResponse {
+  token: string;
+  owner: string;
+  spender: string;
+  current_allowance_raw: string;
+  required?: boolean;
+  permit_supported: boolean;
+  nonce?: number;
+  domain?: {
+    name: string;
+    version: string;
+    chainId: number;
+    verifyingContract: string;
+  };
+}
+
+// Batch-quote per-item shape.
+export interface BatchQuoteItem {
+  ok: boolean;
+  quote: SwapQuoteResponse | null;
+  error: { rejectionCategory: string; message: string } | null;
+}
+
+export interface BatchQuoteResponse {
+  items: BatchQuoteItem[];
 }
 
 export interface SeraErrorBody {
