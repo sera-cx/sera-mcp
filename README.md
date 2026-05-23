@@ -1,8 +1,12 @@
 # sera-mcp
 
-A Model Context Protocol server that turns any agent into a multi-currency agent by exposing [Sera Protocol](https://docs.sera.cx) — stablecoin FX settlement — as one standard tool layer. 32 tools, 5 resources, 4 slash-prompt templates. Works with Claude Code, Claude Desktop, Cursor, OpenAI Agents SDK, **OpenClaw**, **Hermes**, **NanoClaw**, and any other MCP-compatible host.
+**The core MCP server for Sera Protocol.** Turns any agent into a multi-currency agent by exposing [Sera Protocol](https://docs.sera.cx) — stablecoin FX settlement — as one standard tool layer. 32 tools, 5 resources, 4 slash-prompt templates. Works with Claude Code, Claude Desktop, Cursor, OpenAI Agents SDK, **OpenClaw**, **Hermes**, **NanoClaw**, and any other MCP-compatible host.
 
-**Site: [josh-sera.github.io/sera-agents](https://josh-sera.github.io/sera-agents/)** · **Suite: [Josh-sera/sera-agents](https://github.com/Josh-sera/sera-agents)**
+**Who this is for:** agent builders and ops engineers who need their agent to discover currencies, quote, route, and execute stablecoin FX swaps through one standard tool interface.
+
+**Companion repo: [Josh-sera/sera-agents](https://github.com/Josh-sera/sera-agents)** — templates, examples, x402 services, and host integrations built on top of this MCP. **Site: [agents.sera.cx](https://agents.sera.cx)**.
+
+For deeper reading, see [`ARCHITECTURE.md`](ARCHITECTURE.md), [`SECURITY-MODEL.md`](SECURITY-MODEL.md), and [`CHANGELOG.md`](CHANGELOG.md).
 
 This package also ships a `sera` CLI for cron jobs, CI scripts, and ops debugging — see [CLI section](#cli) below.
 
@@ -204,7 +208,7 @@ src/
 │   └── types.ts
 ├── signer/signer.ts            EIP-712 signer (external | local | readonly)
 ├── policy/policy.ts            whitelist, caps, presets, dry-run, daily volume gate
-├── tools/                      29 tool handlers
+├── tools/                      32 tool handlers
 └── util/
     ├── cache.ts                TTL cache + in-flight de-dupe
     ├── limit.ts                bounded-concurrency runner
@@ -215,8 +219,27 @@ src/
     └── sanitize.ts             prompt arg validators
 ```
 
+## Status
+
+Honest read of what's hardened vs what's still moving:
+
+| Surface | Status | Notes |
+|---|---|---|
+| stdio MCP transport | **Stable** | Used in production by Claude Code / Claude Desktop / Cursor / OpenAI Agents SDK |
+| Read tools (discovery, pricing, liquidity, history, treasury reads) | **Stable** | Cached, rate-limit-tolerant, no side effects |
+| Policy gates (whitelist, caps, dry-run, daily volume) | **Stable** | Server-derived notional; quote-registry binding |
+| Quote tools (`get_quote`, `prepare_swap`, `quote_recipient_amount`) | **Stable** | EIP-712 Intent surface stable |
+| External signer execution (`execute_swap` with caller signature) | **Stable** | Server holds no key |
+| Local signer execution (`execute_swap` server-signs, `convert_and_send`) | **Operator-managed** | Requires `SERA_SIGNER_MODE=local` + intentionally funded wallet on a trusted host |
+| API-key treasury tools (`get_balances`, `treasury_value`, `pay_invoice`, `settlement_status`) | **Operator-managed** | Require `SERA_API_KEY` / `SERA_API_SECRET` |
+| Streamable HTTP transport | **Planned** | Additive to stdio; not yet implemented |
+| Tool grouping + execution opt-in flag (`SERA_ENABLE_EXECUTION_TOOLS`) | **Planned** | Hardens the read/exec boundary for future remote HTTP exposure |
+| Read/exec endpoint split (`/mcp/read`, `/mcp/exec`) | **Planned** | Lands with Streamable HTTP |
+
 ## Roadmap
 
+- **Streamable HTTP transport** — additive to stdio; for ChatGPT connectors and hosted/remote agents. SSE is not on the roadmap (deprecated upstream).
+- **Tool grouping + `SERA_ENABLE_EXECUTION_TOOLS` flag** — hides execution tools by default; opt-in for trusted hosts.
 - **Subscriptions** — push deal alerts instead of polling. MCP spec supports it; needs server-side subscriber state.
 - **Multi-hop SOR explorer** — for pairs with no direct corridor, plan via intermediate fiats.
 - **Address risk screening** — sanctions / OFAC hooks (needs an external provider).
