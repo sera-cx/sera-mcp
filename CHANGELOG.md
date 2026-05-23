@@ -2,6 +2,33 @@
 
 All notable changes to `sera-mcp` are documented in this file. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] — 2026-05-24
+
+### Added — Streamable HTTP transport
+- New `--transport http` flag (default remains `stdio`). Opt-in for remote/web-served agent hosts (ChatGPT connectors, hosted multi-tenant, web-chat backends).
+- New env: `SERA_TRANSPORT`, `SERA_HTTP_HOST` (default `127.0.0.1`), `SERA_HTTP_PORT` (default `3848`), `SERA_HTTP_ALLOWED_HOSTS` (comma-separated), `SERA_HTTP_STATELESS`.
+- DNS-rebinding protection automatically enabled when binding to `127.0.0.1` / `localhost` / `::1` (via `createMcpExpressApp`). For non-localhost binds, pass `--allowed-hosts` to restrict by `Host` header.
+- Endpoints: `POST /mcp` (JSON-RPC), `GET /mcp` (SSE stream for stateful notifications), `DELETE /mcp` (session terminate), `GET /health` (liveness probe).
+- Stateful sessions by default (random session ID). `--stateless` for serverless / Cloudflare-Workers-like deploys.
+- Stdio path unchanged — existing Claude Code / Desktop / Cursor registrations keep working.
+
+### Added — new files
+- `src/transports/stdio.ts` — extracted stdio attach.
+- `src/transports/http.ts` — Streamable HTTP attach with DNS-rebinding protection.
+
+### Added — dependency
+- `express ^4.21.0` (runtime; required by `createMcpExpressApp`).
+- `@types/express ^4.17.0` (dev).
+
+### Not yet shipped
+- **OAuth 2.1 + RFC 8707 Resource Indicators** for public/multi-tenant deployment (per MCP spec v2025-06-18). HTTP transport today is safe for localhost binding or behind a trusted reverse proxy. Public exposure without OAuth would mean any caller can invoke any tool — explicitly out of scope for v0.8.0.
+- **Read/exec endpoint split** (`/mcp/read`, `/mcp/exec`) — lands with OAuth so each surface can have its own scope.
+
+### Verified
+- `--transport http` boots clean, returns proper `serverInfo` on initialize, /health responds, DNS-rebinding protection logs as enabled on default 127.0.0.1 bind.
+- Stdio transport unchanged: 51 tools listed identically.
+- 81 tests still pass.
+
 ## [0.7.0] — 2026-05-24
 
 ### Added — maker / order-book tools (9 tools, 42 → 51 total)

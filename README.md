@@ -83,6 +83,28 @@ SERA_NETWORK=mainnet POLICY_PRESET=standard node dist/index.js
 
 Speaks MCP over stdio. The server prints structured JSON status to stderr; stdout is reserved for the protocol.
 
+### Streamable HTTP (remote / web-served)
+
+```bash
+# Default: localhost only, DNS-rebinding protection auto-enabled, stateful sessions
+node dist/index.js --transport http --port 3848
+
+# Bind public with allowedHosts header validation
+node dist/index.js --transport http --host 0.0.0.0 --port 3848 \
+  --allowed-hosts mcp.mydomain.com,localhost
+
+# Serverless / stateless mode
+node dist/index.js --transport http --stateless
+```
+
+Endpoints:
+- `POST /mcp` — JSON-RPC requests
+- `GET /mcp` — SSE stream for notifications (stateful mode)
+- `DELETE /mcp` — session terminate
+- `GET /health` — liveness probe
+
+**Going public requires OAuth 2.1 + RFC 8707 Resource Indicators per MCP spec v2025-06-18.** Auth is NOT in this transport today — bind to localhost or front with a trusted auth-handling reverse proxy. See `SECURITY-MODEL.md` for the planned hardening path.
+
 ## Verify install
 
 In a new agent session, ask:
@@ -236,9 +258,10 @@ Honest read of what's hardened vs what's still moving:
 | Tool annotations (`readOnly` / `destructive` / `idempotent` / `openWorldHint`) | **Stable** (v0.5.0) | Every tool carries annotations the host runtime can use for confirmation UX. |
 | Tool grouping + execution opt-in (`SERA_ENABLE_EXECUTION_TOOLS`) | **Stable** (v0.5.0) | Default `true`; set `false` to hide `execute_swap` + `convert_and_send` entirely. |
 | `convert_and_send` only registered when `SERA_SIGNER_MODE=local` | **Stable** (v0.5.0) | Tool no longer surfaces when it can't work. |
-| Streamable HTTP transport | **Planned** | Additive to stdio; not yet implemented. |
-| Read/exec endpoint split (`/mcp/read`, `/mcp/exec`) | **Planned** | Lands with Streamable HTTP. |
-| Per-tool `outputSchema` + `structuredContent` | **Planned** (v0.5.1) | Machine-readable result shapes for hosts that want to validate or render. |
+| Streamable HTTP transport | **Stable** (v0.8.0) | Additive to stdio; `--transport http` opts in. Localhost-default with DNS-rebinding protection. No OAuth (bind to localhost or front with auth proxy). |
+| Per-tool `outputSchema` + `structuredContent` | **Partial** (v0.7.0) | Live on `doctor`, `list_currencies`, `get_fx_rate`, `market_health`. Remaining tools incremental. |
+| Read/exec endpoint split (`/mcp/read`, `/mcp/exec`) | **Planned** | When OAuth lands. |
+| OAuth 2.1 + RFC 8707 Resource Indicators for remote HTTP | **Planned** | Required before any public/multi-tenant deployment. |
 
 ## Roadmap
 
