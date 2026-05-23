@@ -217,8 +217,10 @@ export class SeraClient {
  * Parse HTTP Retry-After header. Accepts seconds (integer) or HTTP-date.
  * Falls back to RETRY_AFTER_FALLBACK_MS, caps at RETRY_AFTER_CAP_MS to
  * prevent a hostile/buggy upstream from pinning us indefinitely.
+ *
+ * Exported for unit testing.
  */
-function parseRetryAfter(header: string | string[] | undefined): number {
+export function parseRetryAfter(header: string | string[] | undefined): number {
   if (!header) return RETRY_AFTER_FALLBACK_MS;
   const value = Array.isArray(header) ? header[0] : header;
   const asInt = Number.parseInt(value, 10);

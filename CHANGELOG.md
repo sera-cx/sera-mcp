@@ -2,6 +2,25 @@
 
 All notable changes to `sera-mcp` are documented in this file. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.5.2] — 2026-05-24
+
+### Added
+- **Vitest test suite — 81 tests across 5 files.**
+  - `test/sanitize.test.ts` (30 tests) — every prompt-arg validator: injection rejection, fallback semantics, case handling.
+  - `test/quote_registry.test.ts` (12 tests) — register/lookup, auto-expiry, `routeParamsMatch` against tampered minOutputAmount / recipient / uuid, missing-field detection, string-coerced uuid comparison.
+  - `test/policy.test.ts` (23 tests) — symbol/recipient whitelists (incl. EIP-55 vs lowercase), dry-run kill switch, per-tx notional cap with non-USD FX conversion, daily volume cap, preset shape, fiat-from-symbol guess.
+  - `test/client-helpers.test.ts` (11 tests) — `parseRetryAfter` (integer seconds, HTTP-date, cap, negatives, garbage, array-form header) + `lowerOwner` normalization.
+  - `test/cache.test.ts` (5 tests) — TTL expiration, in-flight de-dupe, errors-not-cached, key independence.
+- `tsconfig.test.json` so tests typecheck without breaking build's `rootDir` constraint.
+- `npm run test` + `test:watch` scripts. CI runs tests on every push/PR. `npm run check` now includes tests.
+
+### Changed
+- `parseRetryAfter` and `lowerOwner` exported from `src/sera/client.ts` for direct unit-testing.
+
+### Notes
+- All 81 tests run in ~250ms locally; vitest pool=threads.
+- No behavior change for users — tests lock in the v0.5.1 P0 fixes against regression.
+
 ## [0.5.1] — 2026-05-24
 
 ### Fixed (correctness)
