@@ -99,16 +99,29 @@ This tool is `destructive` — it quotes + executes + transfers in one call. Req
 - Any local process that can write to the MCP's stdin can call any registered tool. Trust boundary = local OS user.
 - No authentication or rate limiting at the MCP layer (relies on host runtime).
 
-### Streamable HTTP (planned, not implemented)
+### Streamable HTTP (shipped v0.8.0)
 
-When added, every HTTP-exposed install will require:
+Opt-in via `--transport http` or `SERA_TRANSPORT=http`. Hardenings shipped:
 
-- DNS rebinding protection via `createMcpExpressApp()` Host header validation.
-- Read/exec endpoint split (`/mcp/read`, `/mcp/exec`).
-- OAuth 2.1 Resource Server pattern with RFC 8707 resource indicators for any remote/multi-tenant deployment.
-- `Cache-Control: no-store` on any future paid/gated endpoints.
+- **DNS rebinding protection** auto-enabled when binding to `127.0.0.1` / `localhost` / `::1` via `createMcpExpressApp()` Host header validation.
+- **Allowed-hosts override** for non-loopback binds via `--allowed-hosts` / `SERA_HTTP_ALLOWED_HOSTS=host1,host2`. Host header validation is enforced but is **not authentication**.
+- **Public-bind startup guard** (`SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC`): binding to a non-loopback host with no `allowedHosts` and no explicit acknowledgment refuses to start. This prevents the most common misdeploy (accidentally exposing `:3848` on `0.0.0.0` with every Sera tool reachable by anyone).
+- **Stateful and stateless modes.** Stateful by default; `--stateless` for serverless deploys.
 
-These hardenings are NOT YET shipped. Do not expose `sera-mcp` over HTTP today.
+**Still missing — required before public/multi-tenant exposure:**
+
+- **OAuth 2.1 Resource Server + RFC 8707 Resource Indicators.** Without it, any caller who can reach the port can invoke every registered tool. Bind to localhost only, or front with an authenticated reverse proxy (e.g. nginx + JWT validation, Cloudflare Access, your own auth-aware gateway).
+- **Read/exec endpoint split** (`/mcp/read`, `/mcp/exec`) — lands with OAuth so each surface can carry its own scope.
+- **Per-tool rate limiting at the MCP layer.**
+
+**Safe deployment matrix:**
+
+| Bind | Auth | Verdict |
+|---|---|---|
+| `127.0.0.1` (default) | none | ✅ Safe — DNS rebinding protection enabled automatically. |
+| `0.0.0.0` or public IP | reverse proxy with auth | ✅ Safe — start guard accepts when `SERA_HTTP_ALLOWED_HOSTS` is set OR `SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC=true` is explicitly acknowledged. |
+| `0.0.0.0` | none, no acknowledgment | ❌ Startup refuses. |
+| `0.0.0.0` | none, `SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC=true` | ⚠️ Boots with loud warning. Only use behind a trusted network boundary. Don't ever set this in a real public deploy. |
 
 ## x402 / payment risks
 
@@ -118,9 +131,9 @@ These hardenings are NOT YET shipped. Do not expose `sera-mcp` over HTTP today.
 
 Explicit list of items that look ready but are not:
 
-- **Streamable HTTP transport**: not implemented. Don't run `sera-mcp` over HTTP today.
-- **Remote multi-tenant deployment**: no OAuth 2.1 / no per-tenant policy. Single-tenant only.
-- **x402-service live mode** (in `sera-agents`): stub verification; replace before going live.
+- **Public/multi-tenant Streamable HTTP**: HTTP transport is shipped (v0.8.0) but has no built-in auth. Safe for `127.0.0.1` (default) or behind a trusted auth-handling reverse proxy. Public exposure without one is gated by `SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC` at startup — do not set it in production.
+- **Remote multi-tenant deployment**: no OAuth 2.1 / no per-tenant policy. Single-tenant only until OAuth 2.1 + RFC 8707 Resource Indicators ship.
+- **x402-service live mode** (in `sera-agents`): wired against Coinbase CDP facilitator in `sera-agents` v0.6.0, but operator-gated behind `X402_LIVE_ACK=true` pending Base Sepolia E2E verification. See `sera-agents/SECURITY-MODEL.md`.
 - **Per-tool rate limiting**: not implemented. `limit_watcher` polls unrate-limited at the MCP layer.
 - **Sanctions / address risk screening**: no built-in OFAC check on `recipient`. Use `POLICY_ALLOWED_RECIPIENTS` whitelist.
 
@@ -160,9 +173,22 @@ POLICY_DRY_RUN=true                    # all execute_swap refuses
 LOG_LEVEL=debug
 ```
 
+### Streamable HTTP behind a trusted auth proxy
+
+```bash
+SERA_TRANSPORT=http
+SERA_HTTP_HOST=0.0.0.0
+SERA_HTTP_PORT=3848
+SERA_HTTP_ALLOWED_HOSTS=mcp.mydomain.com    # host-header allowlist
+SERA_SIGNER_MODE=readonly                    # belt and suspenders
+SERA_ENABLE_EXECUTION_TOOLS=false            # hide execute/convert_and_send entirely
+```
+
+Reverse proxy in front handles auth (OAuth, JWT, mTLS — whatever your platform supports). The MCP itself trusts the proxy because the proxy is the trust boundary.
+
 ### Read-only public deployment (future)
 
-When Streamable HTTP lands, the recommended posture will be:
+When OAuth 2.1 + RFC 8707 ship, the recommended posture will be:
 
 ```bash
 SERA_SIGNER_MODE=readonly

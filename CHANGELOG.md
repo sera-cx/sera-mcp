@@ -2,6 +2,22 @@
 
 All notable changes to `sera-mcp` are documented in this file. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] — 2026-05-24
+
+### Added — public-bind startup guard
+- New env: `SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC`. When the HTTP transport binds to a non-loopback host (anything other than `127.0.0.1` / `localhost` / `::1`) without `--allowed-hosts`, the server refuses to start unless this env is explicitly set to `true`.
+- Boot error message lists the three safe options: localhost bind, allowed-hosts allowlist (assumes auth reverse proxy in front), or explicit unsafe acknowledgment.
+- Host-header validation via `--allowed-hosts` is NOT authentication — it just stops cross-origin browser-borne DNS-rebinding. The guard makes that distinction loud.
+
+### Fixed — docs out of sync (the actual reason for this release)
+- `SECURITY-MODEL.md` no longer says Streamable HTTP is "planned, not implemented" — replaced with the full v0.8.0 hardening status + deployment matrix.
+- `README.md` HTTP section now carries a top-of-section blockquote warning instead of a single trailing paragraph. Three numbered safe-deployment options. Cross-references to SECURITY-MODEL.md for the matrix.
+
+### Verified
+- 81 tests pass.
+- Public-bind guard: `--host 0.0.0.0` without `--allowed-hosts` refuses with clear message.
+- `--host 0.0.0.0 --allowed-hosts test.local` boots cleanly; `/health` responds with matching `Host: test.local` header.
+
 ## [0.8.0] — 2026-05-24
 
 ### Added — Streamable HTTP transport

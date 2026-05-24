@@ -29,10 +29,47 @@ export interface HttpTransportOptions {
   stateless?: boolean;
 }
 
+/**
+ * Refuses to start if binding to a non-loopback host without either:
+ *  - `allowedHosts` (host-header allowlist; assumes auth-handling reverse proxy in front), OR
+ *  - explicit `SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC=true` acknowledgment.
+ *
+ * Host-header validation is NOT authentication — it just stops cross-origin
+ * browser-borne DNS-rebinding attacks. Public exposure without an upstream
+ * auth proxy means anyone reachable on the port can call every registered
+ * Sera tool. This guard is the brake that prevents accidental misdeploys.
+ */
+function enforcePublicBindGuard(opts: HttpTransportOptions): void {
+  const isLoopback =
+    opts.host === "127.0.0.1" || opts.host === "localhost" || opts.host === "::1";
+  if (isLoopback) return;
+  if (opts.allowedHosts && opts.allowedHosts.length > 0) return;
+  const ack =
+    (process.env.SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC ?? "false").toLowerCase() === "true";
+  if (ack) {
+    log.warn(
+      "SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC=true acknowledged — booting with no auth on non-loopback host",
+      { host: opts.host, port: opts.port },
+    );
+    return;
+  }
+  process.stderr.write(
+    `\nrefusing to start: Streamable HTTP has no built-in auth and you're binding\n` +
+      `to a non-loopback host (${opts.host}) without --allowed-hosts.\n\n` +
+      `Pick one:\n` +
+      `  1. Bind to localhost:                --host 127.0.0.1 (default)\n` +
+      `  2. Front with an auth reverse proxy: --host ${opts.host} --allowed-hosts <your.domain>\n` +
+      `  3. Acknowledge the risk:             SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC=true\n` +
+      `                                        (anyone who reaches the port can call every Sera tool)\n\n`,
+  );
+  process.exit(1);
+}
+
 export async function attachStreamableHttp(
   server: McpServer,
   opts: HttpTransportOptions,
 ): Promise<void> {
+  enforcePublicBindGuard(opts);
   const app = createMcpExpressApp({
     host: opts.host,
     ...(opts.allowedHosts ? { allowedHosts: opts.allowedHosts } : {}),

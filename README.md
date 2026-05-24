@@ -103,7 +103,16 @@ Endpoints:
 - `DELETE /mcp` — session terminate
 - `GET /health` — liveness probe
 
-**Going public requires OAuth 2.1 + RFC 8707 Resource Indicators per MCP spec v2025-06-18.** Auth is NOT in this transport today — bind to localhost or front with a trusted auth-handling reverse proxy. See `SECURITY-MODEL.md` for the planned hardening path.
+> **⚠️ NO BUILT-IN AUTH ON STREAMABLE HTTP**
+>
+> Anyone who can reach the bound port can call every registered Sera tool. The transport ships with **DNS-rebinding protection** for localhost binds and a **public-bind startup guard** that refuses to start when binding to a non-loopback host without `--allowed-hosts` or an explicit `SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC=true` acknowledgment. **Do not set the ack env in production.**
+>
+> Safe options:
+> - **Localhost (default):** `--host 127.0.0.1` — DNS rebinding protection auto-enabled.
+> - **Behind an auth-handling reverse proxy:** `--host 0.0.0.0 --allowed-hosts mcp.mydomain.com`. The proxy is the trust boundary; it must handle auth (OAuth, JWT, mTLS, Cloudflare Access — your call).
+> - **Future:** OAuth 2.1 + RFC 8707 Resource Indicators per MCP spec v2025-06-18. Tracked in roadmap.
+>
+> See [`SECURITY-MODEL.md`](SECURITY-MODEL.md) for the full deployment matrix.
 
 ## Verify install
 
