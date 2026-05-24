@@ -132,7 +132,7 @@ Most installs need nothing. Override via env:
 
 | Variable | Default | Effect |
 |---|---|---|
-| `SERA_NETWORK` | `mainnet` | `mainnet` → `https://api.sera.cx/api/v1`. `sepolia` → `https://api-sepolia.sera.cx/api/v1`. URLs are hardcoded; you cannot redirect them via env. |
+| `SERA_NETWORK` | `mainnet` | `mainnet` → `https://api.sera.cx/api/v1`. `sepolia` → `https://api-testnet.sera.cx/api/v1`. URLs are hardcoded; you cannot redirect them via env. |
 
 ### Signer
 

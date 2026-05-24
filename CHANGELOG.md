@@ -2,6 +2,15 @@
 
 All notable changes to `sera-mcp` are documented in this file. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.8.3] — 2026-05-25
+
+### Changed
+- `src/config.ts` — `SERA_NETWORK=sepolia` now resolves to `https://api-testnet.sera.cx/api/v1`. The previous host (`api-sepolia.sera.cx`) does not resolve in DNS; testnet runs against the canonical `api-testnet.sera.cx` endpoint serving Sepolia (chain_id 11155111).
+- `README.md` — env-var table updated to match.
+
+### Verified
+- `api-testnet.sera.cx` `/health` returns `signature_ready: true`; `/config` returns `chain_id: 11155111` with Sera/Vault/SOR contracts and EIP-712 domain populated.
+
 ## [0.8.2] — 2026-05-24
 
 ### Added — test coverage on new code (81 → 109 tests)

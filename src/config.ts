@@ -42,7 +42,7 @@ export interface AppContext {
  */
 const NETWORK_URLS: Record<"mainnet" | "sepolia", string> = {
   mainnet: "https://api.sera.cx/api/v1",
-  sepolia: "https://api-sepolia.sera.cx/api/v1",
+  sepolia: "https://api-testnet.sera.cx/api/v1",
 };
 
 function resolveBaseUrl(network: "mainnet" | "sepolia"): string {
