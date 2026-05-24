@@ -2,6 +2,18 @@
 
 All notable changes to `sera-mcp` are documented in this file. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.8.2] — 2026-05-24
+
+### Added — test coverage on new code (81 → 109 tests)
+- `test/registry.test.ts` (17 tests) — meta-tests over the tool registry: unique names, sera.* prefix, every tool has annotations + inputSchema + handler, allowed category set, destructive flag invariants (KNOWN_DESTRUCTIVE list of 10 tools), readOnly + destructive mutual exclusion, execution + maker category coverage, outputSchema-tagged tools have parseable Zod schemas, the 4 v0.7.0-migrated tools (doctor, list_currencies, get_fx_rate, market_health) still have outputSchema.
+- `test/http-guard.test.ts` (11 tests) — `publicBindGuardDecision` extracted as pure function and tested across localhost variants, 0.0.0.0/public-IP refusal without allowedHosts, allowedHosts allow-path, ack env case-insensitivity, empty allowedHosts array doesn't satisfy the gate.
+
+### Changed
+- `src/transports/http.ts`: extracted `publicBindGuardDecision` as a pure exported function. `enforcePublicBindGuard` is now a thin wrapper that pulls the env + handles process.exit. Pure form is testable in isolation.
+
+### Notes
+- 109 tests pass in ~370ms. No production behavior change — pure test coverage + one refactor for testability.
+
 ## [0.8.1] — 2026-05-24
 
 ### Added — public-bind startup guard

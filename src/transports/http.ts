@@ -29,6 +29,36 @@ export interface HttpTransportOptions {
   stateless?: boolean;
 }
 
+export type GuardDecision =
+  | { allow: true; ack: boolean }
+  | { allow: false; reason: string };
+
+/**
+ * Pure-function form of the public-bind guard — returns a decision the
+ * caller can act on. Used by enforcePublicBindGuard and exported for tests.
+ *
+ * Inputs are explicit (host, allowedHosts, ackEnv) so test runs don't
+ * depend on process.env state.
+ */
+export function publicBindGuardDecision(
+  host: string,
+  allowedHosts: string[] | undefined,
+  ackEnv: string | undefined,
+): GuardDecision {
+  const isLoopback = host === "127.0.0.1" || host === "localhost" || host === "::1";
+  if (isLoopback) return { allow: true, ack: false };
+  if (allowedHosts && allowedHosts.length > 0) return { allow: true, ack: false };
+  const ack = (ackEnv ?? "false").toLowerCase() === "true";
+  if (ack) return { allow: true, ack: true };
+  return {
+    allow: false,
+    reason:
+      `Streamable HTTP has no built-in auth and you're binding to a non-loopback ` +
+      `host (${host}) without allowedHosts. Pick localhost, allowedHosts, or set ` +
+      `SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC=true.`,
+  };
+}
+
 /**
  * Refuses to start if binding to a non-loopback host without either:
  *  - `allowedHosts` (host-header allowlist; assumes auth-handling reverse proxy in front), OR
@@ -40,17 +70,18 @@ export interface HttpTransportOptions {
  * Sera tool. This guard is the brake that prevents accidental misdeploys.
  */
 function enforcePublicBindGuard(opts: HttpTransportOptions): void {
-  const isLoopback =
-    opts.host === "127.0.0.1" || opts.host === "localhost" || opts.host === "::1";
-  if (isLoopback) return;
-  if (opts.allowedHosts && opts.allowedHosts.length > 0) return;
-  const ack =
-    (process.env.SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC ?? "false").toLowerCase() === "true";
-  if (ack) {
-    log.warn(
-      "SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC=true acknowledged — booting with no auth on non-loopback host",
-      { host: opts.host, port: opts.port },
-    );
+  const decision = publicBindGuardDecision(
+    opts.host,
+    opts.allowedHosts,
+    process.env.SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC,
+  );
+  if (decision.allow) {
+    if (decision.ack) {
+      log.warn(
+        "SERA_HTTP_ALLOW_UNAUTHENTICATED_PUBLIC=true acknowledged — booting with no auth on non-loopback host",
+        { host: opts.host, port: opts.port },
+      );
+    }
     return;
   }
   process.stderr.write(
