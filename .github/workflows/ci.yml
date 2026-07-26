@@ -30,8 +30,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: npm audit (high+)
-        run: npm audit --audit-level=high
+      - name: npm audit (production deps, high+)
+        # Only production deps ship; dev/test tooling (e.g. vitest) is not a
+        # runtime surface, so gate on prod high+ only — matches sera-agents CI.
+        run: npm audit --omit=dev --audit-level=high
       - name: secret scan (gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
