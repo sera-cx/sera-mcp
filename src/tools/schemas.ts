@@ -31,6 +31,28 @@ export const ListCurrenciesInput = z.object({
 
 export const GetMarketsInput = z.object({});
 
+export const SearchCoinsInput = z.object({
+  query: z
+    .string()
+    .min(1)
+    .max(64)
+    .describe("Case-insensitive substring matched against token symbol, name, or fiat tag (e.g. 'sgd', 'usd', 'xsg')."),
+});
+
+export const GetCoinMetadataInput = z.object({
+  symbol: TokenSymbol.describe("Token symbol to look up (e.g. 'USDC', 'XSGD'). Case-insensitive."),
+});
+
+export const GetCoinHistoryInput = z.object({
+  symbol: TokenSymbol.describe("Token symbol whose implied fiat pair to pull history for (e.g. 'XSGD' -> SGD/USD). Case-insensitive."),
+  days: z
+    .number()
+    .positive()
+    .max(365)
+    .optional()
+    .describe("Lookback window in days. Default 7."),
+});
+
 export const GetFxRateInput = z.object({
   base: FiatCode.describe("Base ISO currency code (e.g. 'GBP')."),
   quote: FiatCode.describe("Quote ISO currency code (e.g. 'USD')."),

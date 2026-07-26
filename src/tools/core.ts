@@ -2,7 +2,7 @@ import type { AppContext } from "../config.js";
 import type { SwapQuoteRequest } from "../sera/types.js";
 import { getTokensCached, resolveToken, toRawAmount, fromRawAmount } from "../sera/tokens.js";
 import { SeraApiError } from "../sera/client.js";
-import { recordQuote } from "../util/persistence.js";
+import { isHistoryEnabled, queryFxHistory, recordQuote } from "../util/persistence.js";
 import { registerQuote, lookupQuote, routeParamsMatch } from "../util/quote_registry.js";
 
 // ---- list_currencies ----
@@ -30,6 +30,119 @@ export async function listCurrencies(ctx: AppContext, args: { fiat?: string }) {
 export async function getMarkets(ctx: AppContext) {
   const { markets } = await ctx.sera.getMarkets();
   return { count: markets.length, markets };
+}
+
+// ---- search_coins ----
+// Convenience discovery wrapper over /tokens (mirrors sera-mcp-v2's search_coins).
+// Case-insensitive substring match against symbol, name, or fiat tag.
+export async function searchCoins(ctx: AppContext, args: { query: string }) {
+  const tokens = await getTokensCached(ctx.sera);
+  const q = args.query.trim().toLowerCase();
+  const matches = tokens.filter(
+    (t) =>
+      t.symbol.toLowerCase().includes(q) ||
+      (t.name ?? "").toLowerCase().includes(q) ||
+      (t.fiat_currency ?? "").toLowerCase().includes(q),
+  );
+  return {
+    query: args.query,
+    count: matches.length,
+    matches: matches.map((t) => ({
+      symbol: t.symbol,
+      name: t.name,
+      fiat: t.fiat_currency,
+      address: t.address,
+      decimals: t.decimals,
+    })),
+  };
+}
+
+// ---- get_coin_metadata ----
+// Full registry metadata for a single token by symbol (mirrors sera-mcp-v2's
+// get_coin_metadata). Honest not-found object when the symbol is unknown.
+export async function getCoinMetadata(ctx: AppContext, args: { symbol: string }) {
+  const tokens = await getTokensCached(ctx.sera);
+  const upper = args.symbol.trim().toUpperCase();
+  const token = tokens.find((t) => t.symbol.toUpperCase() === upper);
+  if (!token) {
+    return {
+      found: false,
+      symbol: args.symbol,
+      error: `Token "${args.symbol}" not found in Sera's /tokens registry.`,
+      hint: "Use sera.search_coins or sera.list_currencies to discover available symbols.",
+    };
+  }
+  return {
+    found: true,
+    symbol: token.symbol,
+    name: token.name,
+    fiat: token.fiat_currency,
+    address: token.address,
+    decimals: token.decimals,
+  };
+}
+
+// ---- get_coin_history ----
+// Sera doesn't publish OHLC, so this replays this MCP's locally-logged /fx/rate
+// observations for the token's implied fiat pair (e.g. XSGD -> SGD/USD). Requires
+// SERA_HISTORY_DB; returns an honest disabled/empty response otherwise — never
+// fabricates price history.
+export async function getCoinHistory(
+  ctx: AppContext,
+  args: { symbol: string; days?: number },
+) {
+  const tokens = await getTokensCached(ctx.sera);
+  const upper = args.symbol.trim().toUpperCase();
+  const token = tokens.find((t) => t.symbol.toUpperCase() === upper);
+  if (!token) {
+    return {
+      found: false,
+      symbol: args.symbol,
+      error: `Token "${args.symbol}" not found in Sera's /tokens registry.`,
+      hint: "Use sera.search_coins or sera.list_currencies to discover available symbols.",
+    };
+  }
+
+  const base = (token.fiat_currency ?? "").toUpperCase();
+  const quote = "USD";
+  const pair = base ? `${base}/${quote}` : `${token.symbol}/${quote}`;
+
+  if (!isHistoryEnabled()) {
+    return {
+      found: true,
+      symbol: token.symbol,
+      pair,
+      enabled: false,
+      note:
+        "Historical price data is not available. Set SERA_HISTORY_DB=/path/to/sera-history.db " +
+        "on the server so this MCP logs Sera /fx/rate observations and builds its own feed over time.",
+      observations: [],
+    };
+  }
+
+  if (!base) {
+    return {
+      found: true,
+      symbol: token.symbol,
+      pair,
+      enabled: true,
+      note: `No fiat currency is tagged for ${token.symbol}, so there is no implied FX pair to pull history for.`,
+      observations: [],
+    };
+  }
+
+  const days = args.days ?? 7;
+  const sinceTs = Math.floor(Date.now() / 1000) - days * 24 * 3600;
+  const rows = queryFxHistory(base, quote, sinceTs);
+  return {
+    found: true,
+    symbol: token.symbol,
+    pair,
+    enabled: true,
+    days,
+    observation_count: rows.length,
+    observations: rows,
+  };
 }
 
 // ---- get_fx_rate ----
