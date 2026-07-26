@@ -3,6 +3,28 @@
   "version": "0.8.3",
   "description": "Multi-currency MCP server backed by Sera (stablecoin FX). Lets any agent discover currencies, quote, route, and execute stablecoin swaps through one standard tool interface.",
   "type": "module",
+  "homepage": "https://agents.sera.cx",
+  "repository": { "type": "git", "url": "git+https://github.com/sera-cx/sera-mcp.git" },
+  "bugs": { "url": "https://github.com/sera-cx/sera-mcp/issues" },
+  "license": "MIT",
+  "mcpName": "io.github.sera-cx/sera-mcp",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "modelcontextprotocol",
+    "ai-agents",
+    "agent-tools",
+    "x402",
+    "stablecoin",
+    "fx",
+    "foreign-exchange",
+    "cross-border-payments",
+    "settlement",
+    "eip-712",
+    "streamable-http",
+    "sera"
+  ],
   "bin": {
     "sera-mcp": "dist/index.js",
     "sera": "dist/cli.js"

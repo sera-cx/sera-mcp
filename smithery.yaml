@@ -1,0 +1,15 @@
+# Smithery config for the Sera FX MCP server.
+# Declares the already-hosted remote gateway (keyless subset) — no Smithery-side
+# deployment. Docs: https://smithery.ai/docs
+# For the full ~55-tool server, install locally via `npx -y sera-mcp` (stdio).
+runtime: "remote"
+remote:
+  url: "https://agents.sera.cx/mcp"
+  transport: "streamable-http"
+startCommand:
+  type: "http"
+  # No secrets required for the keyless gateway subset.
+  configSchema:
+    type: "object"
+    properties: {}
+    required: []
