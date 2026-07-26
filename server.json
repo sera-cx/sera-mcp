@@ -1,0 +1,27 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.sera-cx/sera-mcp",
+  "title": "Sera FX",
+  "description": "Multi-currency stablecoin FX settlement for AI agents: live rates, corridors, quotes, and non-custodial EIP-712 settlement intents. ~55 tools. Keyless subset available on the hosted gateway.",
+  "version": "0.8.3",
+  "websiteUrl": "https://agents.sera.cx",
+  "repository": {
+    "url": "https://github.com/sera-cx/sera-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "sera-mcp",
+      "version": "0.8.3",
+      "transport": { "type": "stdio" }
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://agents.sera.cx/mcp"
+    }
+  ]
+}
