@@ -34,10 +34,18 @@ jobs:
         # Only production deps ship; dev/test tooling (e.g. vitest) is not a
         # runtime surface, so gate on prod high+ only — matches sera-agents CI.
         run: npm audit --omit=dev --audit-level=high
-      - name: secret scan (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
+      # Use the open-source gitleaks CLI directly. The gitleaks-action wrapper
+      # requires a paid GITLEAKS_LICENSE for organizations; the CLI does not and
+      # runs the same scan engine. (Matches sera-agents CI.)
+      - name: Install gitleaks
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.21.2
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+      - name: Scan for secrets
+        run: gitleaks detect --source . --no-git --redact --exit-code 1
 
   codeql:
     name: CodeQL
