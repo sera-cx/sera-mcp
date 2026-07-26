@@ -37,6 +37,9 @@ import {
   FindCheapestPathInput,
   FindDealsInput,
   FxHistoryInput,
+  GetCoinHistoryInput,
+  GetCoinMetadataInput,
+  SearchCoinsInput,
   FxQuoteDiffInput,
   GetBalancesInput,
   GetFillsForOrderInput,
@@ -76,11 +79,14 @@ import {
 import {
   executeSwap,
   getBalances,
+  getCoinHistory,
+  getCoinMetadata,
   getFxRate,
   getMarkets,
   getQuote,
   listCurrencies,
   prepareSwap,
+  searchCoins,
 } from "./core.js";
 import {
   convertAndSend,
@@ -263,6 +269,36 @@ export const TOOLS: ToolDef[] = [
     annotations: ANN.read("Doctor"),
     category: "discovery",
     handler: (ctx) => doctor(ctx),
+  },
+  {
+    name: "sera.search_coins",
+    title: "Search coins",
+    description:
+      "Fuzzy-find stablecoins in Sera's live /tokens registry by case-insensitive substring match on symbol, name, or fiat tag (e.g. query='sgd'). Convenience wrapper over the same registry as sera.list_currencies. Cached ~1min server-side.",
+    inputSchema: SearchCoinsInput,
+    annotations: ANN.read("Search coins"),
+    category: "discovery",
+    handler: (ctx, args) => searchCoins(ctx, args),
+  },
+  {
+    name: "sera.get_coin_metadata",
+    title: "Coin metadata",
+    description:
+      "Full registry metadata (symbol, name, fiat, address, decimals) for a single stablecoin by symbol from Sera's /tokens registry. Case-insensitive; returns an honest not-found object if the symbol is unknown.",
+    inputSchema: GetCoinMetadataInput,
+    annotations: ANN.read("Coin metadata"),
+    category: "discovery",
+    handler: (ctx, args) => getCoinMetadata(ctx, args),
+  },
+  {
+    name: "sera.get_coin_history",
+    title: "Coin price history",
+    description:
+      "Historical FX observations for a coin's implied fiat pair (e.g. XSGD -> SGD/USD). Sera publishes no OHLC, so this replays this MCP's own logged /fx/rate points and REQUIRES SERA_HISTORY_DB — returns an honest disabled/empty response otherwise. Never fabricates prices.",
+    inputSchema: GetCoinHistoryInput,
+    annotations: ANN.read("Coin history"),
+    category: "discovery",
+    handler: (ctx, args) => getCoinHistory(ctx, args),
   },
 
   // ──────────────────────────────────────────────────────────────── pricing
