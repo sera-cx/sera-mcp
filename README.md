@@ -1,10 +1,10 @@
 # sera-mcp
 
-**The core MCP server for Sera Protocol.** Turns any agent into a multi-currency agent by exposing [Sera Protocol](https://docs.sera.cx) — stablecoin FX settlement — as one standard tool layer. 32 tools, 5 resources, 4 slash-prompt templates. Works with Claude Code, Claude Desktop, Cursor, OpenAI Agents SDK, **OpenClaw**, **Hermes**, **NanoClaw**, and any other MCP-compatible host.
+**The core MCP server for Sera Protocol.** Turns any agent into a multi-currency agent by exposing [Sera Protocol](https://docs.sera.cx) — stablecoin FX settlement — as one standard tool layer. **55 tools**, 5 resources, 4 slash-prompt templates. Works with Claude Code, Claude Desktop, Cursor, OpenAI Agents SDK, **OpenClaw**, **Hermes**, **NanoClaw**, and any other MCP-compatible host.
 
 **Who this is for:** agent builders and ops engineers who need their agent to discover currencies, quote, route, and execute stablecoin FX swaps through one standard tool interface.
 
-**Companion repo: [Josh-sera/sera-agents](https://github.com/Josh-sera/sera-agents)** — templates, examples, x402 services, and host integrations built on top of this MCP. **Site: [agents.sera.cx](https://agents.sera.cx)**.
+**Companion repo: [sera-cx/sera-agents](https://github.com/sera-cx/sera-agents)** — templates, examples, x402 services, and host integrations built on top of this MCP. **Site: [agents.sera.cx](https://agents.sera.cx)**.
 
 For deeper reading, see [`ARCHITECTURE.md`](ARCHITECTURE.md), [`SECURITY-MODEL.md`](SECURITY-MODEL.md), and [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -12,19 +12,21 @@ This package also ships a `sera` CLI for cron jobs, CI scripts, and ops debuggin
 
 ## What you get
 
-**32 tools across 9 categories:**
+**55 tools across 11 categories** (source of truth: [`src/tools/registry.ts`](src/tools/registry.ts)). Under the default `SERA_SIGNER_MODE=external`, `sera.convert_and_send` is hidden (local-signer only), so `tools/list` returns **54**.
 
 | Category | Tools |
 |---|---|
-| Discovery | `list_currencies`, `get_markets` |
+| Discovery | `list_currencies`, `get_markets`, `doctor`, `search_coins`, `get_coin_metadata`, `get_coin_history` |
 | Pricing & analytics | `get_fx_rate`, `compare_to_external_fx`, `multi_source_mid`, `spread_radar` |
-| Liquidity probing | `scan_markets`, `find_deals`, `probe_depth`, `round_trip_cost`, `infer_book` |
-| Quote & execute | `get_quote`, `prepare_swap`, `execute_swap`, `convert_and_send`, `quote_recipient_amount`, `find_cheapest_settlement_path`, `limit_watcher` |
-| Maker | `maker_quote_ladder` |
-| Treasury | `get_balances`, `treasury_value`, `exposure_report`, `rebalance_plan`, `pay_invoice` |
-| Settlement | `settlement_status` |
+| Liquidity probing | `scan_markets`, `find_deals`, `maker_quote_ladder`, `probe_depth`, `round_trip_cost`, `infer_book`, `market_health`, `fx_quote_diff`, `compare_corridors` |
+| Quote & planning | `get_quote`, `prepare_swap`, `quote_recipient_amount`, `find_cheapest_settlement_path`, `limit_watcher`, `batch_quote` |
+| Treasury | `get_balances`, `treasury_value`, `exposure_report`, `rebalance_plan`, `pay_invoice`, `settlement_status` |
 | History | `fx_history`, `fx_volatility`, `corridor_pnl` |
-| Admin | `doctor` |
+| Execution | `execute_swap`, `convert_and_send` (local-signer only) |
+| Account (tx builders) | `build_approve`, `build_deposit`, `build_transfer`, `send_tx`, `send_transfer` |
+| Withdraw (dual-sig) | `withdraw_request`, `withdraw_build`, `withdraw_send` |
+| Debugging | `verify_signature`, `permit_metadata` |
+| Maker | `place_order`, `cancel_order`, `cancel_all_orders`, `place_vl_batch`, `cancel_vl_batch`, `get_order`, `list_orders`, `get_fills`, `get_fills_for_order` |
 
 **5 resources** (`sera://currencies`, `sera://markets`, `sera://config`, `sera://help/tools`, `sera://help/quickstart`) — hosts can browse without burning tool-call budget.
 
@@ -240,7 +242,7 @@ src/
 │   └── types.ts
 ├── signer/signer.ts            EIP-712 signer (external | local | readonly)
 ├── policy/policy.ts            whitelist, caps, presets, dry-run, daily volume gate
-├── tools/                      32 tool handlers
+├── tools/                      55 tool handlers (registry + modules)
 └── util/
     ├── cache.ts                TTL cache + in-flight de-dupe
     ├── limit.ts                bounded-concurrency runner

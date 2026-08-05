@@ -20,7 +20,7 @@ import { listResources, readResource } from "../resources.js";
 import { listPrompts, getPrompt } from "../prompts.js";
 import { log } from "../util/logger.js";
 
-const VERSION = "0.8.2";
+const VERSION = "0.8.3";
 
 export function createServer(ctx: AppContext): {
   server: McpServer;

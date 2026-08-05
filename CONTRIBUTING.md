@@ -14,7 +14,7 @@ Thanks for taking the time. This is the multi-currency settlement Model Context 
 ## Getting set up
 
 ```bash
-git clone https://github.com/Josh-sera/sera-mcp
+git clone https://github.com/sera-cx/sera-mcp
 cd sera-mcp
 npm install
 npm run build
@@ -35,13 +35,13 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 | SERA_NETWORK=mainnet POLICY_PRESET=standard LOG_LEVEL=warn node dist/index.js
 ```
 
-Expect: 32 tools listed and `overall_ok: true` from doctor.
+Expect: **54** tools listed under the default `SERA_SIGNER_MODE=external` (registry has **55**; `sera.convert_and_send` is hidden until `SERA_SIGNER_MODE=local`), and `overall_ok: true` from doctor. Server version in the initialize result should be **0.8.3**.
 
 ## Code style
 
 - TypeScript, ES modules.
 - Match the existing file structure in `src/tools/`.
-- Each new tool: handler in its own file (or a topical group), Zod schema in `src/tools/schemas.ts`, registration in `src/index.ts`.
+- Each new tool: handler in its own file (or a topical group), Zod schema in `src/tools/schemas.ts`, registration via `src/tools/registry.ts` (wired in `src/server/create-server.ts`).
 - Tool descriptions are first-class: write them like docs for an LLM, not for a human reading code.
 - Don't break the security model — if you add anything that can take user input and reach an external system or sign anything, document the threat model.
 
@@ -54,7 +54,7 @@ Expect: 32 tools listed and `overall_ok: true` from doctor.
 
 ## Reporting security issues
 
-Don't open a public issue for security findings. Email the maintainer (see GitHub profile) or use [GitHub's private security advisory](https://github.com/Josh-sera/sera-mcp/security/advisories/new).
+Don't open a public issue for security findings. Email the maintainer (see GitHub profile) or use [GitHub's private security advisory](https://github.com/sera-cx/sera-mcp/security/advisories/new).
 
 ## License
 
