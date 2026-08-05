@@ -10,7 +10,7 @@ This project follows the [Contributor Covenant v2.1](https://www.contributor-cov
 
 ## Enforcement
 
-Issues with conduct can be reported via [GitHub's private security advisory](https://github.com/Josh-sera/sera-mcp/security/advisories/new) or by emailing the maintainer (see GitHub profile). All reports will be reviewed and acted on; the maintainer's decision is final.
+Issues with conduct can be reported via [GitHub's private security advisory](https://github.com/sera-cx/sera-mcp/security/advisories/new) or by emailing the maintainer (see GitHub profile). All reports will be reviewed and acted on; the maintainer's decision is final.
 
 Maintainers may remove comments, lock issues/PRs, or ban contributors for behavior that violates this code.
 

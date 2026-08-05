@@ -3,7 +3,7 @@
  *
  * Order placement, cancellation, and listing. All write operations require
  * the agent to sign Order / CancelOrder / CancelVLBatch structs as EIP-712
- * typed data under the Sera domain — see [Josh-sera/sera-mcp]
+ * typed data under the Sera domain — see [sera-cx/sera-mcp]
  * ARCHITECTURE.md or docs.sera.cx/contracts/sera/ for struct shapes.
  *
  * This file does NOT construct uuid_int values nor sign Orders on the server.

@@ -125,7 +125,7 @@ Opt-in via `--transport http` or `SERA_TRANSPORT=http`. Hardenings shipped:
 
 ## x402 / payment risks
 
-`sera-mcp` itself has no x402 payment surface. The companion repo [`sera-agents`](https://github.com/Josh-sera/sera-agents) ships an x402 service (`x402-service/`) whose live-mode `verifyPayment` is intentional scaffold and is **not production-complete**. See `sera-agents/SECURITY-MODEL.md` for the x402 threat surface.
+`sera-mcp` itself has no x402 payment surface. The companion repo [`sera-agents`](https://github.com/sera-cx/sera-agents) ships an x402 service (`x402-service/`) whose live-mode `verifyPayment` is wired against the Coinbase CDP facilitator, but remains operator-gated behind `X402_LIVE_ACK=true` pending Base Sepolia E2E verification — **not production-complete** until that gate clears. See `sera-agents/SECURITY-MODEL.md` for the x402 threat surface.
 
 ## Not production-ready (today)
 

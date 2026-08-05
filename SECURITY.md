@@ -4,7 +4,7 @@
 
 Please don't open a public issue for security findings.
 
-Use [GitHub's private security advisory](https://github.com/Josh-sera/sera-mcp/security/advisories/new) or contact the maintainer (see profile).
+Use [GitHub's private security advisory](https://github.com/sera-cx/sera-mcp/security/advisories/new) or contact the maintainer (see profile).
 
 We aim to acknowledge reports within 48 hours and ship fixes for verified high/critical findings within 7 days.
 
