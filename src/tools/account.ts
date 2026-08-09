@@ -21,6 +21,57 @@ export async function buildApprove(
   return ctx.sera.buildApprove(args);
 }
 
+/**
+ * Check whether an owner has approved enough of a token for the live Vault.
+ * This deliberately does not build, sign, or submit a transaction.  Keeping
+ * the next action as data lets the calling agent explicitly decide whether to
+ * invoke build_approve.
+ */
+export async function approvalStatus(
+  ctx: AppContext,
+  args: { token: string; owner: string; amount: string },
+) {
+  const config = await ctx.sera.getConfig();
+  const vaultAddress = config.vault_address;
+  const metadata = await ctx.sera.getPermitMetadata({
+    token: args.token,
+    owner: args.owner,
+    spender: vaultAddress,
+    amount: args.amount,
+  });
+  const approvalRequired = BigInt(metadata.current_allowance_raw) < BigInt(args.amount);
+
+  const result = {
+    token: args.token,
+    owner: args.owner,
+    vault_address: vaultAddress,
+    current_allowance_raw: metadata.current_allowance_raw,
+    required_allowance_raw: args.amount,
+    permit_supported: metadata.permit_supported,
+    approval_required: approvalRequired,
+  };
+
+  if (!approvalRequired) {
+    return {
+      ...result,
+      message: "Vault allowance is sufficient; no approve transaction is needed.",
+    };
+  }
+
+  return {
+    ...result,
+    next_step: {
+      tool: "sera.build_approve",
+      arguments: {
+        token: args.token,
+        owner: args.owner,
+        spender: vaultAddress,
+        amount: args.amount,
+      },
+    },
+  };
+}
+
 export async function buildDeposit(
   ctx: AppContext,
   args: {

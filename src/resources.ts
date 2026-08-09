@@ -85,7 +85,7 @@ export async function readResource(ctx: AppContext, uri: string): Promise<Resour
   }
 }
 
-const TOOLS_HELP = `# sera.* tool reference (51 tools)
+const TOOLS_HELP = `# sera.* tool reference (56 tools)
 
 ## Discovery
 - **sera.list_currencies** — registry of supported stablecoins (filterable by fiat).
@@ -129,6 +129,7 @@ const TOOLS_HELP = `# sera.* tool reference (51 tools)
 - **sera.fx_history / sera.fx_volatility / sera.corridor_pnl** — series + stats from logged calls.
 
 ## Account / funds (require SERA_API_KEY; destructive send_* tools move money)
+- **sera.approval_status** — check the current allowance to the live Vault for a required raw amount. If insufficient, returns the complete next call to \`sera.build_approve\`; it never builds, signs, or sends a transaction.
 - **sera.build_approve / sera.send_tx** — build + broadcast an ERC-20 approve.
 - **sera.build_deposit / sera.send_tx** — fund the vault. build_deposit optionally takes permit_signature for one-tx approve+deposit.
 - **sera.build_transfer / sera.send_transfer** — ERC-20 transfer.

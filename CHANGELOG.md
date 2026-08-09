@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `sera.approval_status`, a read-only Vault allowance check. It resolves the Vault from live config and returns an explicit `sera.build_approve` next step only when the allowance is insufficient; it never builds, signs, or broadcasts a transaction.
+- Documentation for the live-Vault allowance flow and its 56-tool registry surface.
+
 All notable changes to `sera-mcp` are documented in this file. Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [0.8.3] — 2026-05-25

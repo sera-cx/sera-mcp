@@ -35,7 +35,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 | SERA_NETWORK=mainnet POLICY_PRESET=standard LOG_LEVEL=warn node dist/index.js
 ```
 
-Expect: 32 tools listed and `overall_ok: true` from doctor.
+Expect: 56 tools listed and `overall_ok: true` from doctor.
 
 ## Code style
 
