@@ -88,7 +88,7 @@ The agent host owns the signing UX. The MCP **never** sees the private key. Risk
 
 ### `convert_and_send`
 
-This tool is `destructive` — it quotes + executes + transfers in one call. Requires `SERA_SIGNER_MODE=local`. It is documented as opt-in. A future release will add `SERA_ENABLE_EXECUTION_TOOLS` to require an explicit env flag before this tool (and `execute_swap`) is even registered with the MCP host.
+This tool is `destructive` — it quotes + executes + transfers in one call. Requires `SERA_SIGNER_MODE=local`. For public or multi-tenant deployments, set `SERA_ENABLE_EXECUTION_TOOLS=false` so this tool (and `execute_swap`) is not registered with the MCP host.
 
 ## Transport risks (current vs future)
 

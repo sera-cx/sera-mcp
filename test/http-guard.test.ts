@@ -21,6 +21,14 @@ describe("publicBindGuardDecision — localhost binds always allowed", () => {
     }
   });
 
+  it("normalizes harmless loopback spelling variants", () => {
+    for (const host of [" LOCALHOST ", "[::1]", "0:0:0:0:0:0:0:1"]) {
+      const d = publicBindGuardDecision(host, undefined, undefined);
+      expect(d.allow).toBe(true);
+      if (d.allow) expect(d.ack).toBe(false);
+    }
+  });
+
   it("localhost allowed even when ack accidentally set", () => {
     const d = publicBindGuardDecision("127.0.0.1", undefined, "true");
     expect(d.allow).toBe(true);
