@@ -204,6 +204,7 @@ export const InferBookInput = z.object({
     .optional()
     .describe("Probe sizes (in respective input currency). Default log-spaced 100→1M."),
   gas_mode: z.enum(["receive_less", "pay_more"]).optional(),
+  max_concurrency: z.number().int().positive().optional(),
 });
 
 export const FxHistoryInput = z.object({
