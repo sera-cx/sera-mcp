@@ -148,6 +148,7 @@ export async function inferBook(
     quote: string;
     sizes?: number[];
     gas_mode?: "receive_less" | "pay_more";
+    max_concurrency?: number;
   },
 ) {
   const baseTok = await resolveToken(ctx.sera, args.base);
@@ -159,8 +160,20 @@ export async function inferBook(
   // Bid side: someone selling base for quote. Probe base -> quote at increasing base sizes.
   // Ask side: someone selling quote for base. Probe quote -> base at increasing quote sizes.
   const [bids, asks] = await Promise.all([
-    probeDepth(ctx, { from: args.base, to: args.quote, sizes, gas_mode: args.gas_mode }),
-    probeDepth(ctx, { from: args.quote, to: args.base, sizes, gas_mode: args.gas_mode }),
+    probeDepth(ctx, {
+      from: args.base,
+      to: args.quote,
+      sizes,
+      gas_mode: args.gas_mode,
+      max_concurrency: args.max_concurrency,
+    }),
+    probeDepth(ctx, {
+      from: args.quote,
+      to: args.base,
+      sizes,
+      gas_mode: args.gas_mode,
+      max_concurrency: args.max_concurrency,
+    }),
   ]);
 
   const bidLadder = (bids.quotes as any[])
@@ -175,8 +188,8 @@ export async function inferBook(
       return { size_quote: q.size, price: askPrice, base_out: baseOut };
     });
 
-  const bestBid = bidLadder[0]?.price;
-  const bestAsk = askLadder[0]?.price;
+  const bestBid = bidLadder.length ? Math.max(...bidLadder.map((b) => b.price)) : undefined;
+  const bestAsk = askLadder.length ? Math.min(...askLadder.map((a) => a.price)) : undefined;
   let spreadBps: number | null = null;
   if (bestBid && bestAsk && bestBid > 0) {
     const mid = (bestBid + bestAsk) / 2;
