@@ -45,7 +45,12 @@ export function publicBindGuardDecision(
   allowedHosts: string[] | undefined,
   ackEnv: string | undefined,
 ): GuardDecision {
-  const isLoopback = host === "127.0.0.1" || host === "localhost" || host === "::1";
+  const normalizedHost = host.trim().toLowerCase().replace(/^\[(.*)\]$/, "$1");
+  const isLoopback =
+    normalizedHost === "127.0.0.1" ||
+    normalizedHost === "localhost" ||
+    normalizedHost === "::1" ||
+    normalizedHost === "0:0:0:0:0:0:0:1";
   if (isLoopback) return { allow: true, ack: false };
   if (allowedHosts && allowedHosts.length > 0) return { allow: true, ack: false };
   const ack = (ackEnv ?? "false").toLowerCase() === "true";
