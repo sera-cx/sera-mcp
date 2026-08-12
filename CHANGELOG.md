@@ -9,6 +9,16 @@
 
 All notable changes to `sera-mcp` are documented in this file. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed — docs / defaults reconciled to the live 55-tool surface
+- `SERVER_VERSION` in `src/server/create-server.ts` aligned to **0.8.3** (was still advertising 0.8.2 in the MCP handshake).
+- README / ARCHITECTURE / CONTRIBUTING: tool count **32 → 55**, full category table matching `src/tools/registry.ts`, and accurate smoke-test expectation (**54** under default `external` signer because `convert_and_send` is local-only).
+- `sera://help/tools` resource (`src/resources.ts`): count **51 → 55**, added missing coin / health / corridor tools so the in-MCP catalog matches the registry.
+- `.env.example`: removed misleading `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` block — this package is not an LLM client.
+- Org links updated `Josh-sera/*` → `sera-cx/*` (README, CONTRIBUTING, SECURITY*, CODE_OF_CONDUCT, maker_orders comment).
+- `SECURITY-MODEL.md` x402 note aligned with current `sera-agents` model (CDP facilitator wired; `X402_LIVE_ACK` / Sepolia E2E still the gate) — no longer calls live verify a “scaffold.”
+
 ## [0.8.3] — 2026-05-25
 
 ### Changed

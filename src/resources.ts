@@ -85,11 +85,17 @@ export async function readResource(ctx: AppContext, uri: string): Promise<Resour
   }
 }
 
-const TOOLS_HELP = `# sera.* tool reference (56 tools)
+const TOOLS_HELP = `# sera.* tool reference (55 tools)
+
+Source of truth: \`src/tools/registry.ts\`. Under default \`SERA_SIGNER_MODE=external\`, \`sera.convert_and_send\` is hidden (local-signer only), so \`tools/list\` returns 54.
 
 ## Discovery
 - **sera.list_currencies** — registry of supported stablecoins (filterable by fiat).
 - **sera.get_markets** — pair catalog. "Pair exists" ≠ "tradeable now"; check via scan_markets.
+- **sera.doctor** — health, config sanity, signer mode, policy summary, persistence state, executor_id, contract addresses, VL batch limits in one call.
+- **sera.search_coins** — fuzzy-find stablecoins by symbol / name / fiat tag.
+- **sera.get_coin_metadata** — full registry metadata for one symbol.
+- **sera.get_coin_history** — historical FX observations for a coin's implied fiat pair (requires \`SERA_HISTORY_DB\`).
 
 ## Pricing & analytics (no liquidity needed)
 - **sera.get_fx_rate** — Sera's reference FX. Has bid/ask asymmetry; pair with compare_to_external_fx.
@@ -100,20 +106,20 @@ const TOOLS_HELP = `# sera.* tool reference (56 tools)
 ## Liquidity probing
 - **sera.scan_markets** — fan out probes across many pairs. Built for the deal-scanner pattern.
 - **sera.find_deals** — scan + external mid comparison + filter ≥X bps. Native deal scanner in one call.
+- **sera.maker_quote_ladder** — earnings table at 5/10/15/25/50/100/200 bps for a given pair + notional.
 - **sera.probe_depth** — quote at a size ladder; price-impact curve for one corridor.
 - **sera.round_trip_cost** — A→B→A cost in bps. Maker spread floor.
 - **sera.infer_book** — synthetic order book inferred from probes in both directions.
+- **sera.market_health** — cheap yes/no quotability probe for one corridor.
+- **sera.fx_quote_diff** — reference /fx/rate vs executable quote rate in bps.
+- **sera.compare_corridors** — rank source currencies for a target output amount.
 
-## Quote & execute
+## Quote & planning
 - **sera.get_quote / sera.prepare_swap** — single-use quote + EIP-712 Intent. Pass simulate=true to probe with no wallet.
-- **sera.execute_swap** — submit signed quote. uuid binding + server-derived USD notional enforced.
-- **sera.convert_and_send** — quote+execute in one call (local signer mode only).
 - **sera.quote_recipient_amount** — inverse: "send recipient exactly X of currency Y; what's the input?"
 - **sera.find_cheapest_settlement_path** — compare gas modes for one corridor.
 - **sera.limit_watcher** — patient quote: poll until target_rate hit or budget exhausted.
-
-## Maker
-- **sera.maker_quote_ladder** — earnings table at 5/10/15/25/50/100/200 bps for a given pair + notional.
+- **sera.batch_quote** — wraps POST /swap/quote/batch (1-50 quotes/round-trip).
 
 ## Treasury (require SERA_API_KEY)
 - **sera.get_balances** — wallet + Vault balances.
@@ -121,12 +127,14 @@ const TOOLS_HELP = `# sera.* tool reference (56 tools)
 - **sera.exposure_report** — currency-mix breakdown only.
 - **sera.rebalance_plan** — given target weights, emit suggested trades (planner only).
 - **sera.pay_invoice** — "I owe X in currency Y; cheapest source asset to pay it?"
-
-## Settlement (requires SERA_API_KEY)
 - **sera.settlement_status** — query Sera /orders for trade history or specific trade.
 
 ## History (requires SERA_HISTORY_DB)
 - **sera.fx_history / sera.fx_volatility / sera.corridor_pnl** — series + stats from logged calls.
+
+## Execution (destructive)
+- **sera.execute_swap** — submit signed quote. uuid binding + server-derived USD notional enforced.
+- **sera.convert_and_send** — quote+execute in one call (local signer mode only; hidden under external).
 
 ## Account / funds (require SERA_API_KEY; destructive send_* tools move money)
 - **sera.approval_status** — check the current allowance to the live Vault for a required raw amount. If insufficient, returns the complete next call to \`sera.build_approve\`; it never builds, signs, or sends a transaction.
@@ -146,12 +154,8 @@ const TOOLS_HELP = `# sera.* tool reference (56 tools)
 - **sera.get_fills / sera.get_fills_for_order** — fill detail with settlement_economics.
 
 ## Debugging / helpers
-- **sera.batch_quote** — wraps POST /swap/quote/batch (1-50 quotes/round-trip).
 - **sera.verify_signature** — test EIP-712 sig without burning a quote.
 - **sera.permit_metadata** — EIP-2612 support + nonce + current allowance.
-
-## Admin
-- **sera.doctor** — health, config sanity, signer mode, policy summary, persistence state, executor_id, contract addresses, VL batch limits in one call.
 `;
 
 const QUICKSTART = `# Sera MCP — quickstart
