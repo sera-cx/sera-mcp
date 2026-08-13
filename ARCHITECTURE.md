@@ -142,7 +142,7 @@ src/
 │   ├── registry.ts           Single source of truth: name, title, description,
 │   │                         inputSchema, annotations, category, handler
 │   ├── schemas.ts            Zod input schemas
-│   └── ...                   55 tool handlers across topical modules
+│   └── ...                   57 tool handlers across topical modules
 └── util/
     ├── cache.ts              TTL cache + in-flight de-dupe
     ├── env.ts                env parsing helpers

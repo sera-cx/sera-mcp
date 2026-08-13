@@ -4,6 +4,40 @@ All notable changes to `sera-mcp` are documented in this file. Versions follow [
 
 ## [Unreleased]
 
+### Added — tools ported from `sera-mcp-v2` (55 → 57 tools)
+`sera-cx/sera-mcp-v2` is a standalone single-file prototype, not a successor to this
+package. Both talk to the same `/api/v1` surface, and this server's endpoint coverage
+is a superset (26 paths vs 10), so its only real contribution was a few tools that had
+no equivalent here. Those are now ported and v2 can be retired.
+
+- `sera.get_trading_pairs` (`src/tools/core.ts`) — every market a single token can route
+  through, with the side (ASK/BID) you'd trade to leave it. Token-centric view of
+  `/markets` that `sera.get_markets` (whole catalog) doesn't provide. Unlike v2's version
+  it takes any reference `resolveToken` understands — symbol, 0x address, or fiat tag —
+  not just a raw address, and reuses the existing 10-min markets cache (no new endpoint).
+- `sera.get_wallet_info` (`src/tools/admin.ts`) — signer mode, resolved taker address,
+  and whether execution tools are exposed. `sera.doctor` reports signer *mode* but never
+  the resolved address, and costs several API round-trips; this is local-only. Returns
+  `address: null` in external/readonly mode, which is the correct answer rather than an
+  error. Deliberately omits v2's `balance_eth` field: v2 held an RPC URL and a private
+  key, this server holds neither by default, and adding an RPC dependency to report gas
+  would undo the external-signer posture.
+- `test/ported-tools.test.ts` (9 tests, 111 → 120) — direction/ASK/BID invariants, all
+  three token-reference forms, empty-vs-unknown-token distinction, and `get_wallet_info`
+  across all three signer modes including signer failure and the no-gas-balance guarantee.
+
+### Not ported
+- **v2's `get_clob_swap_quote`** — not a distinct CLOB path despite the name. It POSTs the
+  same `/swap/quote` endpoint with the same body shape this server's `sera.get_quote`
+  already uses (`SwapQuoteRequest`), minus `gas_mode`. Adding it would be a duplicate tool
+  for zero new capability.
+- **v2's one-shot `execute_deposit` / `execute_withdraw` and auto-broadcast approve inside
+  `execute_swap`** — a design conflict, not a gap. This server deliberately splits
+  build → sign → send (`build_deposit` + `send_tx`, and the 3-step dual-sig withdraw flow)
+  because the default is `SERA_SIGNER_MODE=external` with no key on disk. v2's one-shot
+  flow requires the server to hold a private key. If wanted, these belong behind the same
+  local-signer gate as `convert_and_send`, not as unconditional tools.
+
 ### Changed — docs / defaults reconciled to the live 55-tool surface
 - `SERVER_VERSION` in `src/server/create-server.ts` aligned to **0.8.3** (was still advertising 0.8.2 in the MCP handshake).
 - README / ARCHITECTURE / CONTRIBUTING: tool count **32 → 55**, full category table matching `src/tools/registry.ts`, and accurate smoke-test expectation (**54** under default `external` signer because `convert_and_send` is local-only).

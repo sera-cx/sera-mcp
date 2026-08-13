@@ -130,3 +130,42 @@ export async function doctor(ctx: AppContext) {
     checks,
   };
 }
+
+/**
+ * get_wallet_info — ported from sera-mcp-v2. Answers the single question
+ * "who am I signing as?" without the full doctor round-trip (doctor reports
+ * signer *mode* but never the resolved address, and costs 4 API calls).
+ *
+ * Deliberately omits v2's native-ETH balance field: v2 held an RPC URL and a
+ * private key, this server holds neither by default. Gas balance is the
+ * caller's business under the external-signer model, and inventing an RPC
+ * dependency here to report it would undo that.
+ *
+ * Works in every signer mode. In external mode there may be no address at all,
+ * which is a normal, correct answer — not an error.
+ */
+export async function getWalletInfo(ctx: AppContext) {
+  let address: string | undefined;
+  let addressError: string | undefined;
+  try {
+    address = await ctx.signer.address();
+  } catch (e: any) {
+    addressError = e?.message ?? String(e);
+  }
+
+  return {
+    signer_mode: ctx.signer.mode,
+    address: address ?? null,
+    ...(addressError ? { address_error: addressError } : {}),
+    can_sign: ctx.signer.mode === "local",
+    execution_tools_enabled: ctx.cfg.enableExecutionTools,
+    network: ctx.cfg.network,
+    base_url: ctx.cfg.baseUrl,
+    note:
+      ctx.signer.mode === "local"
+        ? "Server holds a private key and signs on your behalf. Gas balance is not checked here — this server holds no RPC."
+        : ctx.signer.mode === "external"
+        ? "Server holds no key and no taker address. Agents sign EIP-712 payloads themselves and pass their own taker address per call."
+        : "Readonly mode — execution is disabled.",
+  };
+}

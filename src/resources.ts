@@ -85,13 +85,15 @@ export async function readResource(ctx: AppContext, uri: string): Promise<Resour
   }
 }
 
-const TOOLS_HELP = `# sera.* tool reference (55 tools)
+const TOOLS_HELP = `# sera.* tool reference (57 tools)
 
-Source of truth: \`src/tools/registry.ts\`. Under default \`SERA_SIGNER_MODE=external\`, \`sera.convert_and_send\` is hidden (local-signer only), so \`tools/list\` returns 54.
+Source of truth: \`src/tools/registry.ts\`. Under default \`SERA_SIGNER_MODE=external\`, \`sera.convert_and_send\` is hidden (local-signer only), so \`tools/list\` returns 56.
 
 ## Discovery
 - **sera.list_currencies** — registry of supported stablecoins (filterable by fiat).
 - **sera.get_markets** — pair catalog. "Pair exists" ≠ "tradeable now"; check via scan_markets.
+- **sera.get_trading_pairs** — every market one token can route through, with the side (ASK/BID) to trade. Token-centric view of get_markets.
+- **sera.get_wallet_info** — signer mode + resolved taker address (null in external mode). Cheap "whose address signs this?" check; no API round-trip.
 - **sera.doctor** — health, config sanity, signer mode, policy summary, persistence state, executor_id, contract addresses, VL batch limits in one call.
 - **sera.search_coins** — fuzzy-find stablecoins by symbol / name / fiat tag.
 - **sera.get_coin_metadata** — full registry metadata for one symbol.

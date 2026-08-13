@@ -38,6 +38,8 @@ import {
   FindDealsInput,
   FxHistoryInput,
   GetCoinHistoryInput,
+  GetTradingPairsInput,
+  GetWalletInfoInput,
   GetCoinMetadataInput,
   SearchCoinsInput,
   FxQuoteDiffInput,
@@ -84,6 +86,7 @@ import {
   getFxRate,
   getMarkets,
   getQuote,
+  getTradingPairs,
   listCurrencies,
   prepareSwap,
   searchCoins,
@@ -104,7 +107,7 @@ import {
   rebalancePlan,
   payInvoice,
 } from "./treasury.js";
-import { doctor } from "./admin.js";
+import { doctor, getWalletInfo } from "./admin.js";
 import { findDeals } from "./deals.js";
 import { makerQuoteLadder, multiSourceMid } from "./maker.js";
 import { limitWatcher } from "./watcher.js";
@@ -258,6 +261,26 @@ export const TOOLS: ToolDef[] = [
     annotations: ANN.read("Markets"),
     category: "discovery",
     handler: (ctx) => getMarkets(ctx),
+  },
+  {
+    name: "sera.get_trading_pairs",
+    title: "Trading pairs for a token",
+    description:
+      "List every market a single token can be swapped through, with the side (ASK/BID) you'd trade to leave that token. Token-centric view of /markets — use this instead of sera.get_markets when you already know the token and want its routes. Accepts symbol, 0x address, or fiat tag. Same caveat as get_markets: pair existence ≠ tradeable now.",
+    inputSchema: GetTradingPairsInput,
+    annotations: ANN.read("Trading pairs"),
+    category: "discovery",
+    handler: (ctx, args) => getTradingPairs(ctx, args),
+  },
+  {
+    name: "sera.get_wallet_info",
+    title: "Signer identity",
+    description:
+      "Who is this server signing as? Returns signer mode, resolved taker address (null in external/readonly mode — that is normal, not an error), whether execution tools are exposed, and the active network. Cheap local-only answer to 'whose address will my swap use' — sera.doctor covers the same ground plus API health at the cost of several round-trips. Does not report gas balance: this server holds no RPC.",
+    inputSchema: GetWalletInfoInput,
+    annotations: ANN.pureRead("Signer identity"),
+    category: "discovery",
+    handler: (ctx) => getWalletInfo(ctx),
   },
   {
     name: "sera.doctor",

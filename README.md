@@ -1,6 +1,6 @@
 # sera-mcp
 
-**The core MCP server for Sera Protocol.** Turns any agent into a multi-currency agent by exposing [Sera Protocol](https://docs.sera.cx) — stablecoin FX settlement — as one standard tool layer. **55 tools**, 5 resources, 4 slash-prompt templates. Works with Claude Code, Claude Desktop, Cursor, OpenAI Agents SDK, **OpenClaw**, **Hermes**, **NanoClaw**, and any other MCP-compatible host.
+**The core MCP server for Sera Protocol.** Turns any agent into a multi-currency agent by exposing [Sera Protocol](https://docs.sera.cx) — stablecoin FX settlement — as one standard tool layer. **57 tools**, 5 resources, 4 slash-prompt templates. Works with Claude Code, Claude Desktop, Cursor, OpenAI Agents SDK, **OpenClaw**, **Hermes**, **NanoClaw**, and any other MCP-compatible host.
 
 **Who this is for:** agent builders and ops engineers who need their agent to discover currencies, quote, route, and execute stablecoin FX swaps through one standard tool interface.
 
@@ -12,11 +12,11 @@ This package also ships a `sera` CLI for cron jobs, CI scripts, and ops debuggin
 
 ## What you get
 
-**55 tools across 11 categories** (source of truth: [`src/tools/registry.ts`](src/tools/registry.ts)). Under the default `SERA_SIGNER_MODE=external`, `sera.convert_and_send` is hidden (local-signer only), so `tools/list` returns **54**.
+**57 tools across 11 categories** (source of truth: [`src/tools/registry.ts`](src/tools/registry.ts)). Under the default `SERA_SIGNER_MODE=external`, `sera.convert_and_send` is hidden (local-signer only), so `tools/list` returns **56**.
 
 | Category | Tools |
 |---|---|
-| Discovery | `list_currencies`, `get_markets`, `doctor`, `search_coins`, `get_coin_metadata`, `get_coin_history` |
+| Discovery | `list_currencies`, `get_markets`, `get_trading_pairs`, `get_wallet_info`, `doctor`, `search_coins`, `get_coin_metadata`, `get_coin_history` |
 | Pricing & analytics | `get_fx_rate`, `compare_to_external_fx`, `multi_source_mid`, `spread_radar` |
 | Liquidity probing | `scan_markets`, `find_deals`, `maker_quote_ladder`, `probe_depth`, `round_trip_cost`, `infer_book`, `market_health`, `fx_quote_diff`, `compare_corridors` |
 | Quote & planning | `get_quote`, `prepare_swap`, `quote_recipient_amount`, `find_cheapest_settlement_path`, `limit_watcher`, `batch_quote` |
@@ -242,7 +242,7 @@ src/
 │   └── types.ts
 ├── signer/signer.ts            EIP-712 signer (external | local | readonly)
 ├── policy/policy.ts            whitelist, caps, presets, dry-run, daily volume gate
-├── tools/                      55 tool handlers (registry + modules)
+├── tools/                      57 tool handlers (registry + modules)
 └── util/
     ├── cache.ts                TTL cache + in-flight de-dupe
     ├── limit.ts                bounded-concurrency runner

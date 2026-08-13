@@ -31,6 +31,18 @@ export const ListCurrenciesInput = z.object({
 
 export const GetMarketsInput = z.object({});
 
+export const GetTradingPairsInput = z.object({
+  token: z
+    .string()
+    .min(1)
+    .max(64)
+    .describe(
+      "Token to find pairs for. Accepts a symbol ('XSGD'), a 0x address, or a fiat tag ('SGD').",
+    ),
+});
+
+export const GetWalletInfoInput = z.object({});
+
 export const SearchCoinsInput = z.object({
   query: z
     .string()

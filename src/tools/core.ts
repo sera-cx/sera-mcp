@@ -32,6 +32,49 @@ export async function getMarkets(ctx: AppContext) {
   return { count: markets.length, markets };
 }
 
+// ---- get_trading_pairs ----
+// Ported from sera-mcp-v2. Answers "what can I swap this token into?" — the
+// token-centric view of /markets that get_markets (whole catalog) doesn't give.
+// Unlike v2 this accepts any token reference resolveToken understands (symbol,
+// address, or fiat tag), not just a raw 0x address.
+//
+// direction is the side the caller would trade to go from -> to: the resolved
+// token sitting on a market's base side means selling base for quote (ASK).
+export async function getTradingPairs(ctx: AppContext, args: { token: string }) {
+  const tok = await resolveToken(ctx.sera, args.token);
+  const { markets } = await ctx.sera.getMarkets();
+  const addr = tok.address.toLowerCase();
+
+  const pairs = markets
+    .filter(
+      (m) =>
+        m.base_token.toLowerCase() === addr || m.quote_token.toLowerCase() === addr,
+    )
+    .map((m) => {
+      const isBase = m.base_token.toLowerCase() === addr;
+      return {
+        display_pair: m.display_pair,
+        direction: isBase ? "ASK" : "BID",
+        from: {
+          symbol: isBase ? m.base_symbol : m.quote_symbol,
+          address: isBase ? m.base_token : m.quote_token,
+        },
+        to: {
+          symbol: isBase ? m.quote_symbol : m.base_symbol,
+          address: isBase ? m.quote_token : m.base_token,
+        },
+      };
+    });
+
+  return {
+    token: { symbol: tok.symbol, address: tok.address, decimals: tok.decimals },
+    count: pairs.length,
+    // Same caveat as get_markets: a listed pair is not proof of live liquidity.
+    note: "Pair existence != tradeable now. Use sera.scan_markets or sera.get_quote to confirm liquidity.",
+    pairs,
+  };
+}
+
 // ---- search_coins ----
 // Convenience discovery wrapper over /tokens (mirrors sera-mcp-v2's search_coins).
 // Case-insensitive substring match against symbol, name, or fiat tag.
