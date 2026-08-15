@@ -85,9 +85,9 @@ export async function readResource(ctx: AppContext, uri: string): Promise<Resour
   }
 }
 
-const TOOLS_HELP = `# sera.* tool reference (55 tools)
+const TOOLS_HELP = `# sera.* tool reference (56 tools)
 
-Source of truth: \`src/tools/registry.ts\`. Under default \`SERA_SIGNER_MODE=external\`, \`sera.convert_and_send\` is hidden (local-signer only), so \`tools/list\` returns 54.
+Source of truth: \`src/tools/registry.ts\`. Under default \`SERA_SIGNER_MODE=external\`, \`sera.convert_and_send\` is hidden (local-signer only), so \`tools/list\` returns 55.
 
 ## Discovery
 - **sera.list_currencies** — registry of supported stablecoins (filterable by fiat).
