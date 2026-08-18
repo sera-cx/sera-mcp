@@ -26,6 +26,28 @@ no equivalent here. Those are now ported and v2 can be retired.
   three token-reference forms, empty-vs-unknown-token distinction, and `get_wallet_info`
   across all three signer modes including signer failure and the no-gas-balance guarantee.
 
+### Added — structured output for the discovery surface (4 → 10 tools with `outputSchema`)
+`create-server.ts` emits `structuredContent` whenever a tool declares an `outputSchema`,
+and the MCP SDK **validates** that payload against the schema. That makes schema drift a
+runtime failure for every caller, not a soft degradation — so the rollout is deliberate
+and test-guarded rather than bulk-generated.
+
+- `GetMarketsOutput`, `GetTradingPairsOutput`, `GetWalletInfoOutput`, `SearchCoinsOutput`,
+  `GetCoinMetadataOutput`, `GetCoinHistoryOutput` — all 8 `discovery` tools now declare
+  structured output. `get_coin_metadata` (2 return shapes) and `get_coin_history` (4)
+  are modelled as one permissive object each with optional fields, so every branch
+  validates without a discriminated union that hosts would flatten anyway.
+- All new schemas are `.passthrough()`. A strict object rejects unknown keys, so a
+  handler that later grows a field would start erroring for every caller. The 4 pre-existing
+  v0.7.0 schemas are unchanged.
+- `test/output-schemas.test.ts` (10 tests, 120 → 130) — parses each schema against the
+  handler's **actual** output, covering the not-found / history-disabled / untagged-token
+  branches and a token with no `name` or `fiat_currency`. Two registry invariants lock the
+  rollout in: every `discovery` tool must declare an `outputSchema`, and the set of strict
+  (non-passthrough) schemas may never grow.
+- Verified end-to-end: `createServer()` registers all 56 default-mode tools with the new
+  schemas, confirming Zod → JSON Schema conversion succeeds for every one.
+
 ### Not ported
 - **v2's `get_clob_swap_quote`** — not a distinct CLOB path despite the name. It POSTs the
   same `/swap/quote` endpoint with the same body shape this server's `sera.get_quote`

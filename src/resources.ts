@@ -90,6 +90,7 @@ const TOOLS_HELP = `# sera.* tool reference (57 tools)
 Source of truth: \`src/tools/registry.ts\`. Under default \`SERA_SIGNER_MODE=external\`, \`sera.convert_and_send\` is hidden (local-signer only), so \`tools/list\` returns 56.
 
 ## Discovery
+All discovery tools return validated structured output (\`outputSchema\`), so hosts can render/parse results directly.
 - **sera.list_currencies** — registry of supported stablecoins (filterable by fiat).
 - **sera.get_markets** — pair catalog. "Pair exists" ≠ "tradeable now"; check via scan_markets.
 - **sera.get_trading_pairs** — every market one token can route through, with the side (ASK/BID) to trade. Token-centric view of get_markets.

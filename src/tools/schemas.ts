@@ -518,6 +518,129 @@ export const FxRateOutput = z.object({
   change_pct: z.union([z.string(), z.null()]).optional(),
 }).passthrough();
 
+// ── discovery outputs ────────────────────────────────────────────────────
+// Every schema below is .passthrough(): the SDK VALIDATES structuredContent
+// against outputSchema, so a field the handler emits but the schema omits
+// turns a working tool into a runtime error. Passthrough keeps these
+// descriptive (hosts get real structure) without being a breakage risk when
+// a handler or the upstream /tokens payload grows a field.
+
+const TokenSummary = z
+  .object({
+    symbol: z.string(),
+    address: z.string(),
+    decimals: z.number(),
+  })
+  .passthrough();
+
+export const GetMarketsOutput = z
+  .object({
+    count: z.number(),
+    markets: z.array(
+      z
+        .object({
+          base_token: z.string(),
+          quote_token: z.string(),
+          base_symbol: z.string(),
+          quote_symbol: z.string(),
+          display_pair: z.string(),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+
+export const GetTradingPairsOutput = z
+  .object({
+    token: TokenSummary,
+    count: z.number(),
+    note: z.string(),
+    pairs: z.array(
+      z
+        .object({
+          display_pair: z.string(),
+          // Side to trade to LEAVE the queried token, not the market's own side.
+          direction: z.enum(["ASK", "BID"]),
+          from: z.object({ symbol: z.string(), address: z.string() }).passthrough(),
+          to: z.object({ symbol: z.string(), address: z.string() }).passthrough(),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+
+export const GetWalletInfoOutput = z
+  .object({
+    signer_mode: z.enum(["local", "external", "readonly"]),
+    // null is the CORRECT answer in external/readonly mode, not a failure.
+    address: z.union([z.string(), z.null()]),
+    address_error: z.string().optional(),
+    can_sign: z.boolean(),
+    execution_tools_enabled: z.boolean(),
+    network: z.enum(["mainnet", "sepolia"]),
+    base_url: z.string(),
+    note: z.string(),
+  })
+  .passthrough();
+
+export const SearchCoinsOutput = z
+  .object({
+    query: z.string(),
+    count: z.number(),
+    matches: z.array(
+      z
+        .object({
+          symbol: z.string(),
+          name: z.string().optional(),
+          fiat: z.string().optional(),
+          address: z.string(),
+          decimals: z.number(),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+
+// Two shapes behind one schema: found:true carries the registry record,
+// found:false carries error+hint. Optional fields rather than a discriminated
+// union so hosts that flatten JSON Schema anyOf still render something useful.
+export const GetCoinMetadataOutput = z
+  .object({
+    found: z.boolean(),
+    symbol: z.string(),
+    name: z.string().optional(),
+    fiat: z.string().optional(),
+    address: z.string().optional(),
+    decimals: z.number().optional(),
+    error: z.string().optional(),
+    hint: z.string().optional(),
+  })
+  .passthrough();
+
+// Four shapes: unknown symbol, history disabled, no fiat tag to imply a pair,
+// and the populated case. `observations` is always an array when found:true,
+// so agents can iterate without a shape check.
+export const GetCoinHistoryOutput = z
+  .object({
+    found: z.boolean(),
+    symbol: z.string(),
+    pair: z.string().optional(),
+    enabled: z.boolean().optional(),
+    days: z.number().optional(),
+    observation_count: z.number().optional(),
+    observations: z
+      .array(
+        z
+          .object({ ts: z.number(), rate: z.number(), source: z.string() })
+          .passthrough(),
+      )
+      .optional(),
+    note: z.string().optional(),
+    error: z.string().optional(),
+    hint: z.string().optional(),
+  })
+  .passthrough();
+
 export const ListCurrenciesOutput = z.object({
   count: z.number(),
   policy_allowed_symbols: z.union([z.array(z.string()), z.literal("all")]),

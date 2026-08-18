@@ -38,8 +38,14 @@ import {
   FindDealsInput,
   FxHistoryInput,
   GetCoinHistoryInput,
+  GetCoinHistoryOutput,
+  GetCoinMetadataOutput,
+  GetMarketsOutput,
   GetTradingPairsInput,
+  GetTradingPairsOutput,
   GetWalletInfoInput,
+  GetWalletInfoOutput,
+  SearchCoinsOutput,
   GetCoinMetadataInput,
   SearchCoinsInput,
   FxQuoteDiffInput,
@@ -258,6 +264,7 @@ export const TOOLS: ToolDef[] = [
     description:
       "List the active trading-pair catalog from /markets. NOTE: pair existence ≠ tradeable now — use sera.scan_markets to find what's actually quotable. Cached 10min server-side.",
     inputSchema: GetMarketsInput,
+    outputSchema: GetMarketsOutput,
     annotations: ANN.read("Markets"),
     category: "discovery",
     handler: (ctx) => getMarkets(ctx),
@@ -268,6 +275,7 @@ export const TOOLS: ToolDef[] = [
     description:
       "List every market a single token can be swapped through, with the side (ASK/BID) you'd trade to leave that token. Token-centric view of /markets — use this instead of sera.get_markets when you already know the token and want its routes. Accepts symbol, 0x address, or fiat tag. Same caveat as get_markets: pair existence ≠ tradeable now.",
     inputSchema: GetTradingPairsInput,
+    outputSchema: GetTradingPairsOutput,
     annotations: ANN.read("Trading pairs"),
     category: "discovery",
     handler: (ctx, args) => getTradingPairs(ctx, args),
@@ -278,6 +286,7 @@ export const TOOLS: ToolDef[] = [
     description:
       "Who is this server signing as? Returns signer mode, resolved taker address (null in external/readonly mode — that is normal, not an error), whether execution tools are exposed, and the active network. Cheap local-only answer to 'whose address will my swap use' — sera.doctor covers the same ground plus API health at the cost of several round-trips. Does not report gas balance: this server holds no RPC.",
     inputSchema: GetWalletInfoInput,
+    outputSchema: GetWalletInfoOutput,
     annotations: ANN.pureRead("Signer identity"),
     category: "discovery",
     handler: (ctx) => getWalletInfo(ctx),
@@ -299,6 +308,7 @@ export const TOOLS: ToolDef[] = [
     description:
       "Fuzzy-find stablecoins in Sera's live /tokens registry by case-insensitive substring match on symbol, name, or fiat tag (e.g. query='sgd'). Convenience wrapper over the same registry as sera.list_currencies. Cached ~1min server-side.",
     inputSchema: SearchCoinsInput,
+    outputSchema: SearchCoinsOutput,
     annotations: ANN.read("Search coins"),
     category: "discovery",
     handler: (ctx, args) => searchCoins(ctx, args),
@@ -309,6 +319,7 @@ export const TOOLS: ToolDef[] = [
     description:
       "Full registry metadata (symbol, name, fiat, address, decimals) for a single stablecoin by symbol from Sera's /tokens registry. Case-insensitive; returns an honest not-found object if the symbol is unknown.",
     inputSchema: GetCoinMetadataInput,
+    outputSchema: GetCoinMetadataOutput,
     annotations: ANN.read("Coin metadata"),
     category: "discovery",
     handler: (ctx, args) => getCoinMetadata(ctx, args),
@@ -319,6 +330,7 @@ export const TOOLS: ToolDef[] = [
     description:
       "Historical FX observations for a coin's implied fiat pair (e.g. XSGD -> SGD/USD). Sera publishes no OHLC, so this replays this MCP's own logged /fx/rate points and REQUIRES SERA_HISTORY_DB — returns an honest disabled/empty response otherwise. Never fabricates prices.",
     inputSchema: GetCoinHistoryInput,
+    outputSchema: GetCoinHistoryOutput,
     annotations: ANN.read("Coin history"),
     category: "discovery",
     handler: (ctx, args) => getCoinHistory(ctx, args),
