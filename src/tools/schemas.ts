@@ -387,6 +387,18 @@ export const BuildApproveInput = z.object({
   amount: Uint256Decimal.describe("Raw uint256 allowance amount (token base units)."),
 });
 
+/**
+ * Read-only Vault allowance check.  Unlike PermitMetadataInput, callers do
+ * not choose the spender: approvalStatus resolves the live Vault from
+ * GET /config so an agent cannot be steered toward an arbitrary allowance
+ * target.
+ */
+export const ApprovalStatusInput = z.object({
+  token: EvmAddress.describe("ERC-20 token address."),
+  owner: EvmAddress.describe("Wallet whose Vault allowance is checked."),
+  amount: Uint256Decimal.describe("Required raw uint256 allowance amount (token base units)."),
+});
+
 export const BuildDepositInput = z.object({
   token: EvmAddress,
   owner: EvmAddress,

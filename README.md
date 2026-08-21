@@ -1,6 +1,6 @@
 # sera-mcp
 
-**The core MCP server for Sera Protocol.** Turns any agent into a multi-currency agent by exposing [Sera Protocol](https://docs.sera.cx) — stablecoin FX settlement — as one standard tool layer. **55 tools**, 5 resources, 4 slash-prompt templates. Works with Claude Code, Claude Desktop, Cursor, OpenAI Agents SDK, **OpenClaw**, **Hermes**, **NanoClaw**, and any other MCP-compatible host.
+**The core MCP server for Sera Protocol.** Turns any agent into a multi-currency agent by exposing [Sera Protocol](https://docs.sera.cx) — stablecoin FX settlement — as one standard tool layer. **56 tools**, 5 resources, 4 slash-prompt templates. Works with Claude Code, Claude Desktop, Cursor, OpenAI Agents SDK, **OpenClaw**, **Hermes**, **NanoClaw**, and any other MCP-compatible host.
 
 **Who this is for:** agent builders and ops engineers who need their agent to discover currencies, quote, route, and execute stablecoin FX swaps through one standard tool interface.
 
@@ -12,7 +12,7 @@ This package also ships a `sera` CLI for cron jobs, CI scripts, and ops debuggin
 
 ## What you get
 
-**55 tools across 11 categories** (source of truth: [`src/tools/registry.ts`](src/tools/registry.ts)). Under the default `SERA_SIGNER_MODE=external`, `sera.convert_and_send` is hidden (local-signer only), so `tools/list` returns **54**.
+**56 tools across 11 categories** (source of truth: [`src/tools/registry.ts`](src/tools/registry.ts)). Under the default `SERA_SIGNER_MODE=external`, `sera.convert_and_send` is hidden (local-signer only), so `tools/list` returns **55**.
 
 | Category | Tools |
 |---|---|
@@ -242,7 +242,7 @@ src/
 │   └── types.ts
 ├── signer/signer.ts            EIP-712 signer (external | local | readonly)
 ├── policy/policy.ts            whitelist, caps, presets, dry-run, daily volume gate
-├── tools/                      55 tool handlers (registry + modules)
+├── tools/                      56 tool handlers (registry + modules)
 └── util/
     ├── cache.ts                TTL cache + in-flight de-dupe
     ├── limit.ts                bounded-concurrency runner

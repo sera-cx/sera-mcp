@@ -18,6 +18,7 @@ import type { AppContext } from "../config.js";
 
 import {
   BatchQuoteInput,
+  ApprovalStatusInput,
   BuildApproveInput,
   BuildDepositInput,
   BuildTransferInput,
@@ -116,6 +117,7 @@ import {
 } from "./health_corridors.js";
 import {
   buildApprove,
+  approvalStatus,
   buildDeposit,
   buildTransfer,
   sendTx,
@@ -609,6 +611,16 @@ export const TOOLS: ToolDef[] = [
   // tx builders return unsigned EIP-1559 transactions; the matching send_*
   // tool broadcasts the locally-signed raw_tx.
   {
+    name: "sera.approval_status",
+    title: "Check Vault ERC-20 allowance",
+    description:
+      "Read the current ERC-20 allowance for the live Vault and compare it to a required raw amount. The Vault spender is resolved from live Sera config, never supplied by the caller. If approval is needed, returns the complete explicit arguments for sera.build_approve; it never builds, signs, or broadcasts a transaction.",
+    inputSchema: ApprovalStatusInput,
+    annotations: ANN.read("Approval status"),
+    category: "account",
+    handler: (ctx, args) => approvalStatus(ctx, args),
+  },
+  {
     name: "sera.build_approve",
     title: "Build ERC-20 approve tx",
     description:
@@ -837,4 +849,3 @@ export const TOOLS_BY_CATEGORY: Record<ToolCategory, ToolDef[]> = TOOLS.reduce(
   },
   {} as Record<ToolCategory, ToolDef[]>,
 );
-
