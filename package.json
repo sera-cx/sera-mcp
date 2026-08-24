@@ -4,8 +4,13 @@
   "description": "Multi-currency MCP server backed by Sera (stablecoin FX). Lets any agent discover currencies, quote, route, and execute stablecoin swaps through one standard tool interface.",
   "type": "module",
   "homepage": "https://agents.sera.cx",
-  "repository": { "type": "git", "url": "git+https://github.com/sera-cx/sera-mcp.git" },
-  "bugs": { "url": "https://github.com/sera-cx/sera-mcp/issues" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sera-cx/sera-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sera-cx/sera-mcp/issues"
+  },
   "license": "MIT",
   "mcpName": "io.github.sera-cx/sera-mcp",
   "keywords": [
@@ -49,8 +54,10 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "biome:check": "biome ci .",
+    "biome:format": "biome format --write .",
     "audit": "npm audit --omit=dev --audit-level=high",
-    "check": "npm run typecheck && npm run test && npm run audit"
+    "check": "npm run biome:check && npm run typecheck && npm run test && npm run audit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.0",
@@ -61,6 +68,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.8",
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^4.17.0",
     "@types/node": "^22.7.5",
