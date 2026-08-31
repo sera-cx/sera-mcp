@@ -35,7 +35,8 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 | SERA_NETWORK=mainnet POLICY_PRESET=standard LOG_LEVEL=warn node dist/index.js
 ```
 
-Expect: **54** tools listed under the default `SERA_SIGNER_MODE=external` (registry has **55**; `sera.convert_and_send` is hidden until `SERA_SIGNER_MODE=local`), and `overall_ok: true` from doctor. Server version in the initialize result should be **0.8.3**.
+
+Expect: the registry to have **56** tools and `tools/list` to return **55** under the default `SERA_SIGNER_MODE=external` (`sera.convert_and_send` is hidden until `SERA_SIGNER_MODE=local`), and `overall_ok: true` from doctor. Server version in the initialize result should be **0.8.3**.
 
 ## Code style
 

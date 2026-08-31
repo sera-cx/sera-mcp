@@ -1,6 +1,6 @@
 # sera-mcp
 
-**The core MCP server for Sera Protocol.** Turns any agent into a multi-currency agent by exposing [Sera Protocol](https://docs.sera.cx) — stablecoin FX settlement — as one standard tool layer. **57 tools**, 5 resources, 4 slash-prompt templates. Works with Claude Code, Claude Desktop, Cursor, OpenAI Agents SDK, **OpenClaw**, **Hermes**, **NanoClaw**, and any other MCP-compatible host.
+**The core MCP server for Sera Protocol.** Turns any agent into a multi-currency agent by exposing [Sera Protocol](https://docs.sera.cx) — stablecoin FX settlement — as one standard tool layer. **58 tools**, 5 resources, 4 slash-prompt templates. Works with Claude Code, Claude Desktop, Cursor, OpenAI Agents SDK, **OpenClaw**, **Hermes**, **NanoClaw**, and any other MCP-compatible host.
 
 **Who this is for:** agent builders and ops engineers who need their agent to discover currencies, quote, route, and execute stablecoin FX swaps through one standard tool interface.
 
@@ -12,7 +12,7 @@ This package also ships a `sera` CLI for cron jobs, CI scripts, and ops debuggin
 
 ## What you get
 
-**57 tools across 11 categories** (source of truth: [`src/tools/registry.ts`](src/tools/registry.ts)). Under the default `SERA_SIGNER_MODE=external`, `sera.convert_and_send` is hidden (local-signer only), so `tools/list` returns **56**.
+**58 tools across 11 categories** (source of truth: [`src/tools/registry.ts`](src/tools/registry.ts)). Under the default `SERA_SIGNER_MODE=external`, `sera.convert_and_send` is hidden (local-signer only), so `tools/list` returns **57**.
 
 | Category | Tools |
 |---|---|
@@ -23,7 +23,7 @@ This package also ships a `sera` CLI for cron jobs, CI scripts, and ops debuggin
 | Treasury | `get_balances`, `treasury_value`, `exposure_report`, `rebalance_plan`, `pay_invoice`, `settlement_status` |
 | History | `fx_history`, `fx_volatility`, `corridor_pnl` |
 | Execution | `execute_swap`, `convert_and_send` (local-signer only) |
-| Account (tx builders) | `build_approve`, `build_deposit`, `build_transfer`, `send_tx`, `send_transfer` |
+| Account (tx builders) | `build_approve`, `approval_status`, `build_deposit`, `build_transfer`, `send_tx`, `send_transfer` |
 | Withdraw (dual-sig) | `withdraw_request`, `withdraw_build`, `withdraw_send` |
 | Debugging | `verify_signature`, `permit_metadata` |
 | Maker | `place_order`, `cancel_order`, `cancel_all_orders`, `place_vl_batch`, `cancel_vl_batch`, `get_order`, `list_orders`, `get_fills`, `get_fills_for_order` |
@@ -242,7 +242,7 @@ src/
 │   └── types.ts
 ├── signer/signer.ts            EIP-712 signer (external | local | readonly)
 ├── policy/policy.ts            whitelist, caps, presets, dry-run, daily volume gate
-├── tools/                      57 tool handlers (registry + modules)
+├── tools/                      58 tool handlers (registry + modules)
 └── util/
     ├── cache.ts                TTL cache + in-flight de-dupe
     ├── limit.ts                bounded-concurrency runner
@@ -270,7 +270,7 @@ Honest read of what's hardened vs what's still moving:
 | Tool grouping + execution opt-in (`SERA_ENABLE_EXECUTION_TOOLS`) | **Stable** (v0.5.0) | Default `true`; set `false` to hide `execute_swap` + `convert_and_send` entirely. |
 | `convert_and_send` only registered when `SERA_SIGNER_MODE=local` | **Stable** (v0.5.0) | Tool no longer surfaces when it can't work. |
 | Streamable HTTP transport | **Stable** (v0.8.0) | Additive to stdio; `--transport http` opts in. Localhost-default with DNS-rebinding protection. No OAuth (bind to localhost or front with auth proxy). |
-| Per-tool `outputSchema` + `structuredContent` | **Partial** (v0.7.0) | Live on `doctor`, `list_currencies`, `get_fx_rate`, `market_health`. Remaining tools incremental. |
+| Per-tool `outputSchema` + `structuredContent` | **Partial** | Live on all 8 `discovery` tools plus `get_fx_rate` and `market_health` (10 of 58). Enforced by `test/output-schemas.test.ts`, which parses each schema against real handler output. Remaining categories incremental. |
 | Read/exec endpoint split (`/mcp/read`, `/mcp/exec`) | **Planned** | When OAuth lands. |
 | OAuth 2.1 + RFC 8707 Resource Indicators for remote HTTP | **Planned** | Required before any public/multi-tenant deployment. |
 

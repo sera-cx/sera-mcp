@@ -4,7 +4,14 @@ All notable changes to `sera-mcp` are documented in this file. Versions follow [
 
 ## [Unreleased]
 
-### Added — tools ported from `sera-mcp-v2` (55 → 57 tools)
+### Added
+
+- `sera.approval_status`, a read-only Vault allowance check. It resolves the Vault from live config and returns an explicit `sera.build_approve` next step only when the allowance is insufficient; it never builds, signs, or broadcasts a transaction.
+- Documentation for the live-Vault allowance flow and its 56-tool registry surface.
+
+### Changed — docs / defaults reconciled to the live 58-tool registry
+
+### Added — tools ported from `sera-mcp-v2` (56 → 58 tools)
 `sera-cx/sera-mcp-v2` is a standalone single-file prototype, not a successor to this
 package. Both talk to the same `/api/v1` surface, and this server's endpoint coverage
 is a superset (26 paths vs 10), so its only real contribution was a few tools that had
@@ -62,8 +69,8 @@ and test-guarded rather than bulk-generated.
 
 ### Changed — docs / defaults reconciled to the live 55-tool surface
 - `SERVER_VERSION` in `src/server/create-server.ts` aligned to **0.8.3** (was still advertising 0.8.2 in the MCP handshake).
-- README / ARCHITECTURE / CONTRIBUTING: tool count **32 → 55**, full category table matching `src/tools/registry.ts`, and accurate smoke-test expectation (**54** under default `external` signer because `convert_and_send` is local-only).
-- `sera://help/tools` resource (`src/resources.ts`): count **51 → 55**, added missing coin / health / corridor tools so the in-MCP catalog matches the registry.
+- README / ARCHITECTURE / CONTRIBUTING: tool count **32 → 56**, full category table matching `src/tools/registry.ts`, and accurate smoke-test expectation (**55** under default `external` signer because `convert_and_send` is local-only).
+- `sera://help/tools` resource (`src/resources.ts`): count **51 → 56**, added missing coin / health / corridor tools so the in-MCP catalog matches the registry.
 - `.env.example`: removed misleading `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` block — this package is not an LLM client.
 - Org links updated `Josh-sera/*` → `sera-cx/*` (README, CONTRIBUTING, SECURITY*, CODE_OF_CONDUCT, maker_orders comment).
 - `SECURITY-MODEL.md` x402 note aligned with current `sera-agents` model (CDP facilitator wired; `X402_LIVE_ACK` / Sepolia E2E still the gate) — no longer calls live verify a “scaffold.”

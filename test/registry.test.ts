@@ -42,8 +42,8 @@ const KNOWN_DESTRUCTIVE = new Set([
 ]);
 
 describe("TOOLS registry — basic invariants", () => {
-  it("has at least 50 tools (current is 51)", () => {
-    expect(TOOLS.length).toBeGreaterThanOrEqual(50);
+  it("has at least 56 tools (current is 56)", () => {
+    expect(TOOLS.length).toBeGreaterThanOrEqual(56);
   });
 
   it("every tool name is unique", () => {
@@ -93,6 +93,14 @@ describe("TOOLS registry — basic invariants", () => {
 });
 
 describe("TOOLS registry — annotation correctness", () => {
+  it("registers approval_status as a read-only account tool", () => {
+    const tool = TOOLS.find((t) => t.name === "sera.approval_status");
+    expect(tool).toBeDefined();
+    expect(tool?.category).toBe("account");
+    expect(tool?.annotations.readOnly).toBe(true);
+    expect(tool?.annotations.destructive).toBeFalsy();
+  });
+
   it("known destructive tools are flagged destructive: true", () => {
     for (const t of TOOLS) {
       if (KNOWN_DESTRUCTIVE.has(t.name)) {
