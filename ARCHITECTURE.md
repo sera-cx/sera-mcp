@@ -141,7 +141,7 @@ src/
 ├── tools/
 │   ├── registry.ts           Single source of truth: name, title, description,
 │   │                         inputSchema, annotations, category, handler
-│   ├── schemas.ts            Zod input schemas
+│   ├── schemas.ts            Zod input + output schemas
 │   └── ...                   57 tool handlers across topical modules
 └── util/
     ├── cache.ts              TTL cache + in-flight de-dupe
@@ -151,8 +151,7 @@ src/
     ├── persistence.ts        optional SQLite log
     ├── logger.ts             structured stderr JSON
     ├── quote_registry.ts     uuid → route_params binding
-    ├── sanitize.ts           prompt arg validators
-    └── zod-to-json.ts        Zod → MCP JSON Schema bridge
+    └── sanitize.ts           prompt arg validators
 ```
 
 ## Tool registration flow
