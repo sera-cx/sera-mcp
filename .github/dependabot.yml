@@ -1,0 +1,29 @@
+version: 2
+
+updates:
+  # Runtime + dev dependencies. Grouped so routine patch bumps arrive as one
+  # reviewable PR instead of one per package.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      production-patch-minor:
+        dependency-type: production
+        update-types: [minor, patch]
+      development:
+        dependency-type: development
+        update-types: [minor, patch]
+    # No ignore rules: the groups above match only minor/patch, so majors are
+    # left ungrouped and arrive as their own PR. A breaking change is never
+    # buried inside a routine bump.
+
+  # Keeps the SHA-pinned actions in ci.yml current. Dependabot reads the
+  # trailing `# v4` comment, bumps the SHA, and updates the comment — which is
+  # what makes pinning sustainable rather than a thing that silently rots.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
