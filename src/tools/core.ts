@@ -48,20 +48,21 @@ export async function getTradingPairs(ctx: AppContext, args: { token: string }) 
   const pairs = markets
     .filter(
       (m) =>
-        m.base_token.toLowerCase() === addr || m.quote_token.toLowerCase() === addr,
+        m.base_address?.toLowerCase() === addr ||
+        m.quote_address?.toLowerCase() === addr,
     )
     .map((m) => {
-      const isBase = m.base_token.toLowerCase() === addr;
+      const isBase = m.base_address.toLowerCase() === addr;
       return {
-        display_pair: m.display_pair,
+        pair: m.symbol,
         direction: isBase ? "ASK" : "BID",
         from: {
           symbol: isBase ? m.base_symbol : m.quote_symbol,
-          address: isBase ? m.base_token : m.quote_token,
+          address: isBase ? m.base_address : m.quote_address,
         },
         to: {
           symbol: isBase ? m.quote_symbol : m.base_symbol,
-          address: isBase ? m.quote_token : m.base_token,
+          address: isBase ? m.quote_address : m.base_address,
         },
       };
     });

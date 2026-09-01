@@ -9,12 +9,31 @@ export interface SeraToken {
   name?: string;
 }
 
+/**
+ * A row from GET /markets.
+ *
+ * Field names verified against live api.sera.cx/api/v1/markets. An earlier
+ * version of this interface declared `base_token` / `quote_token` /
+ * `display_pair`, none of which the API has ever returned — which is why
+ * scan.ts and deals.ts read `m.base_symbol ?? m.base_address` defensively.
+ * Anything consuming a market should use the names below.
+ */
 export interface SeraMarket {
-  base_token: string;       // address
-  quote_token: string;      // address
+  symbol: string;           // pair label, e.g. "BRZ/AUDM"
+  base_address: string;
+  quote_address: string;
   base_symbol: string;
   quote_symbol: string;
-  display_pair: string;     // e.g. "XSGD/USDC"
+  base_decimals: number;
+  quote_decimals: number;
+  // Present on live rows; not required by anything here, so kept optional so a
+  // trimmed payload still type-checks.
+  tick_precision?: number;
+  quantity_precision?: number;
+  min_ask_amount_raw?: string;
+  min_ask_amount?: string;
+  min_bid_quote_amount_raw?: string;
+  min_bid_quote_amount?: string;
 }
 
 export type GasMode = "receive_less" | "pay_more";

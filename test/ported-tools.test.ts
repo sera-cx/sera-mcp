@@ -9,6 +9,7 @@ import { describe, it, expect } from "vitest";
 import { getTradingPairs } from "../src/tools/core.js";
 import { getWalletInfo } from "../src/tools/admin.js";
 import type { AppContext } from "../src/config.js";
+import type { SeraMarket } from "../src/sera/types.js";
 
 const TOKENS = [
   { symbol: "XSGD", name: "XSGD", address: "0xAAA0000000000000000000000000000000000001", decimals: 6, fiat_currency: "SGD" },
@@ -16,13 +17,17 @@ const TOKENS = [
   { symbol: "EURC", name: "Euro Coin", address: "0xCCC0000000000000000000000000000000000003", decimals: 6, fiat_currency: "EUR" },
 ];
 
-const MARKETS = [
+// Typed as SeraMarket so a drift between these fixtures and the real /markets
+// shape is a compile error. These previously used base_token/quote_token/
+// display_pair — names the API has never returned — which is exactly why the
+// suite stayed green while both tools failed against production.
+const MARKETS: SeraMarket[] = [
   // XSGD on the base side -> selling XSGD is an ASK.
-  { base_token: TOKENS[0].address, quote_token: TOKENS[1].address, base_symbol: "XSGD", quote_symbol: "USDC", display_pair: "XSGD/USDC" },
+  { symbol: "XSGD/USDC", base_address: TOKENS[0].address, quote_address: TOKENS[1].address, base_symbol: "XSGD", quote_symbol: "USDC", base_decimals: 6, quote_decimals: 6 },
   // XSGD on the quote side -> leaving XSGD is a BID.
-  { base_token: TOKENS[2].address, quote_token: TOKENS[0].address, base_symbol: "EURC", quote_symbol: "XSGD", display_pair: "EURC/XSGD" },
+  { symbol: "EURC/XSGD", base_address: TOKENS[2].address, quote_address: TOKENS[0].address, base_symbol: "EURC", quote_symbol: "XSGD", base_decimals: 6, quote_decimals: 6 },
   // Unrelated pair — must be filtered out.
-  { base_token: TOKENS[1].address, quote_token: TOKENS[2].address, base_symbol: "USDC", quote_symbol: "EURC", display_pair: "USDC/EURC" },
+  { symbol: "USDC/EURC", base_address: TOKENS[1].address, quote_address: TOKENS[2].address, base_symbol: "USDC", quote_symbol: "EURC", base_decimals: 6, quote_decimals: 6 },
 ];
 
 function ctxWith(overrides: Partial<AppContext> = {}): AppContext {
@@ -54,14 +59,14 @@ describe("get_trading_pairs", () => {
     const res = await getTradingPairs(ctxWith(), { token: "XSGD" });
 
     expect(res.count).toBe(2);
-    expect(res.pairs.map((p) => p.display_pair).sort()).toEqual(["EURC/XSGD", "XSGD/USDC"]);
+    expect(res.pairs.map((p) => p.pair).sort()).toEqual(["EURC/XSGD", "XSGD/USDC"]);
 
-    const ask = res.pairs.find((p) => p.display_pair === "XSGD/USDC")!;
+    const ask = res.pairs.find((p) => p.pair === "XSGD/USDC")!;
     expect(ask.direction).toBe("ASK");
     expect(ask.from.symbol).toBe("XSGD");
     expect(ask.to.symbol).toBe("USDC");
 
-    const bid = res.pairs.find((p) => p.display_pair === "EURC/XSGD")!;
+    const bid = res.pairs.find((p) => p.pair === "EURC/XSGD")!;
     expect(bid.direction).toBe("BID");
     // Leaving XSGD means XSGD is always the `from` side, whichever side of the
     // book it sits on. This is the invariant the direction flag exists to hold.

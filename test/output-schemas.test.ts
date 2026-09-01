@@ -30,16 +30,21 @@ import {
 } from "../src/tools/schemas.js";
 import { TOOLS } from "../src/tools/registry.js";
 import type { AppContext } from "../src/config.js";
+import type { SeraMarket } from "../src/sera/types.js";
 
 const TOKENS = [
   { symbol: "XSGD", name: "XSGD", address: "0xAAA0000000000000000000000000000000000001", decimals: 6, fiat_currency: "SGD" },
   { symbol: "USDC", name: "USD Coin", address: "0xBBB0000000000000000000000000000000000002", decimals: 6, fiat_currency: "USD" },
   // No fiat tag and no name — exercises the optional fields in the schemas.
   { symbol: "WEIRD", address: "0xCCC0000000000000000000000000000000000003", decimals: 18 },
+  // Real BRZ address, so the live-payload test below can resolve it.
+  // getTokensCached memoizes per module for 60s, so overriding getTokens inside
+  // a single test has no effect once the cache is warm — the token must be here.
+  { symbol: "BRZ", name: "Brazilian Digital Token", address: "0x01d33fd36ec67c6ada32cf36b31e88ee190b1839", decimals: 18, fiat_currency: "BRL" },
 ];
 
-const MARKETS = [
-  { base_token: TOKENS[0].address, quote_token: TOKENS[1].address, base_symbol: "XSGD", quote_symbol: "USDC", display_pair: "XSGD/USDC" },
+const MARKETS: SeraMarket[] = [
+  { symbol: "XSGD/USDC", base_address: TOKENS[0].address, quote_address: TOKENS[1].address, base_symbol: "XSGD", quote_symbol: "USDC", base_decimals: 6, quote_decimals: 6 },
 ];
 
 function ctx(): AppContext {
@@ -133,5 +138,51 @@ describe("outputSchema rollout invariants", () => {
     expect(strict.sort()).toEqual(
       ["sera.doctor", "sera.list_currencies", "sera.market_health"].sort(),
     );
+  });
+});
+
+/**
+ * A verbatim row from live api.sera.cx/api/v1/markets (captured 2026-09-01).
+ * The key set below is the union across all 780 rows returned that day.
+ *
+ * This is the guard that was missing: the previous fixtures used invented
+ * field names, so GetMarketsOutput could require base_token/quote_token/
+ * display_pair — fields the API has never returned — while every test stayed
+ * green and sera.get_markets failed for real callers with an SDK output
+ * validation error.
+ */
+const LIVE_MARKET_ROW = {
+  symbol: "BRZ/AUDM",
+  base_address: "0x01d33fd36ec67c6ada32cf36b31e88ee190b1839",
+  quote_address: "0x081599e4936d12c46bd48913b2329115cd26cbdd",
+  base_symbol: "BRZ",
+  quote_symbol: "AUDM",
+  tick_precision: 18,
+  quantity_precision: 18,
+  base_decimals: 18,
+  quote_decimals: 18,
+  min_ask_amount_raw: "500000000000000000",
+  min_ask_amount: "0.500000000000000000",
+  min_bid_quote_amount_raw: "200000000000000000",
+  min_bid_quote_amount: "0.200000000000000000",
+};
+
+describe("schemas accept the real /markets payload", () => {
+  it("GetMarketsOutput validates a verbatim live row", () => {
+    const payload = { count: 1, markets: [LIVE_MARKET_ROW] };
+    expect(() => GetMarketsOutput.parse(payload)).not.toThrow();
+  });
+
+  it("get_trading_pairs works on a verbatim live row", async () => {
+    const c = ctx();
+    (c.sera as any).getMarkets = async () => ({ markets: [LIVE_MARKET_ROW] });
+
+    const out = await getTradingPairs(c, { token: "BRZ" });
+    expect(out.count).toBe(1);
+    expect(out.pairs[0].pair).toBe("BRZ/AUDM");
+    expect(out.pairs[0].direction).toBe("ASK");
+    expect(out.pairs[0].to.symbol).toBe("AUDM");
+    // And the declared schema must accept what the handler actually returns.
+    expect(() => GetTradingPairsOutput.parse(out)).not.toThrow();
   });
 });

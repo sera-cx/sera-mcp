@@ -161,7 +161,7 @@ export const ScanMarketsInput = z.object({
     .array(z.object({ base: z.string(), quote: z.string() }))
     .max(500)
     .optional()
-    .describe("Explicit list of pairs (max 500). If omitted, enumerates from /markets and applies max_pairs."),
+    .describe("Explicit list of pairs (max 500). If omitted, enumerates from /markets. Either way the list is capped by max_pairs (default 50), so raise max_pairs to scan more than 50."),
   notional_per_quote: z
     .number()
     .positive()
@@ -172,7 +172,7 @@ export const ScanMarketsInput = z.object({
     .int()
     .positive()
     .optional()
-    .describe("Cap on pairs scanned when no explicit list is given. Default 50."),
+    .describe("Cap on pairs scanned. Default 50. Applies to an explicit `pairs` list as well as to /markets enumeration; when it truncates, the response sets truncated: true."),
   max_concurrency: z
     .number()
     .int()
@@ -367,9 +367,11 @@ export const CompareCorridorsInput = z.object({
 export const SpreadRadarInput = z.object({
   currencies: z
     .array(z.string())
+    .max(12)
     .optional()
     .describe(
-      "List of ISO fiat codes to scan (e.g. ['USD','SGD','MYR']). Defaults to USD/SGD/MYR/EUR/GBP/JPY.",
+      "List of ISO fiat codes to scan, max 12 (e.g. ['USD','SGD','MYR']). Defaults to USD/SGD/MYR/EUR/GBP/JPY. " +
+        "Cost is quadratic: n currencies issue n*(n-1) FX calls, so 12 is already 132.",
     ),
   spread_alert_bps: z
     .number()
@@ -551,14 +553,20 @@ const TokenSummary = z
 export const GetMarketsOutput = z
   .object({
     count: z.number(),
+    // Shape verified against live api.sera.cx/api/v1/markets. Only fields the
+    // API actually returns may be required here: the SDK validates
+    // structuredContent against this schema, so a required field the payload
+    // lacks turns get_markets into a hard error for every caller.
     markets: z.array(
       z
         .object({
-          base_token: z.string(),
-          quote_token: z.string(),
+          symbol: z.string(),
+          base_address: z.string(),
+          quote_address: z.string(),
           base_symbol: z.string(),
           quote_symbol: z.string(),
-          display_pair: z.string(),
+          base_decimals: z.number(),
+          quote_decimals: z.number(),
         })
         .passthrough(),
     ),
@@ -573,7 +581,7 @@ export const GetTradingPairsOutput = z
     pairs: z.array(
       z
         .object({
-          display_pair: z.string(),
+          pair: z.string(),
           // Side to trade to LEAVE the queried token, not the market's own side.
           direction: z.enum(["ASK", "BID"]),
           from: z.object({ symbol: z.string(), address: z.string() }).passthrough(),
