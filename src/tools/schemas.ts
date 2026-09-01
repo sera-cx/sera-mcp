@@ -31,6 +31,18 @@ export const ListCurrenciesInput = z.object({
 
 export const GetMarketsInput = z.object({});
 
+export const GetTradingPairsInput = z.object({
+  token: z
+    .string()
+    .min(1)
+    .max(64)
+    .describe(
+      "Token to find pairs for. Accepts a symbol ('XSGD'), a 0x address, or a fiat tag ('SGD').",
+    ),
+});
+
+export const GetWalletInfoInput = z.object({});
+
 export const SearchCoinsInput = z.object({
   query: z
     .string()
@@ -147,8 +159,9 @@ export const FindCheapestPathInput = z.object({
 export const ScanMarketsInput = z.object({
   pairs: z
     .array(z.object({ base: z.string(), quote: z.string() }))
+    .max(500)
     .optional()
-    .describe("Explicit list of pairs. If omitted, enumerates from /markets and applies max_pairs."),
+    .describe("Explicit list of pairs (max 500). If omitted, enumerates from /markets. Either way the list is capped by max_pairs (default 50), so raise max_pairs to scan more than 50."),
   notional_per_quote: z
     .number()
     .positive()
@@ -159,7 +172,7 @@ export const ScanMarketsInput = z.object({
     .int()
     .positive()
     .optional()
-    .describe("Cap on pairs scanned when no explicit list is given. Default 50."),
+    .describe("Cap on pairs scanned. Default 50. Applies to an explicit `pairs` list as well as to /markets enumeration; when it truncates, the response sets truncated: true."),
   max_concurrency: z
     .number()
     .int()
@@ -183,8 +196,9 @@ export const ProbeDepthInput = z.object({
   to: CurrencyRef,
   sizes: z
     .array(z.number().positive())
+    .max(50)
     .optional()
-    .describe("Human input sizes to probe. Default [100, 1000, 10000, 100000]."),
+    .describe("Human input sizes to probe (max 50). Default [100, 1000, 10000, 100000]."),
   gas_mode: z.enum(["receive_less", "pay_more"]).optional(),
   max_concurrency: z.number().int().positive().optional(),
 });
@@ -201,8 +215,9 @@ export const InferBookInput = z.object({
   quote: CurrencyRef,
   sizes: z
     .array(z.number().positive())
+    .max(50)
     .optional()
-    .describe("Probe sizes (in respective input currency). Default log-spaced 100→1M."),
+    .describe("Probe sizes (max 50, in respective input currency). Default log-spaced 100→1M."),
   gas_mode: z.enum(["receive_less", "pay_more"]).optional(),
   max_concurrency: z.number().int().positive().optional(),
 });
@@ -214,7 +229,7 @@ export const FxHistoryInput = z.object({
 });
 
 export const TreasuryValueInput = z.object({
-  owner_addresses: z.array(z.string()).min(1).describe("One or more 0x... wallets to aggregate."),
+  owner_addresses: z.array(z.string()).min(1).max(50).describe("1–50 0x... wallets to aggregate."),
   target_currency: z.string().optional().describe("ISO fiat to value in. Default 'USD'."),
   include_zero: z.boolean().optional().describe("Include zero-balance lines. Default false."),
 });
@@ -222,7 +237,7 @@ export const TreasuryValueInput = z.object({
 export const ExposureReportInput = TreasuryValueInput.pick({ owner_addresses: true, target_currency: true });
 
 export const RebalancePlanInput = z.object({
-  owner_addresses: z.array(z.string()).min(1),
+  owner_addresses: z.array(z.string()).min(1).max(50),
   target_weights: z
     .record(z.number().nonnegative())
     .describe("Map of fiat code → weight, e.g. { USD: 50, SGD: 30, MYR: 20 }. Normalized internally."),
@@ -239,7 +254,7 @@ export const PayInvoiceInput = z.object({
   recipient: z.string(),
   amount: z.number().positive().describe("Recipient should receive exactly this in `target_currency` units."),
   target_currency: z.string().describe("ISO fiat the recipient wants (e.g. 'SGD')."),
-  source_symbols: z.array(z.string()).min(1).describe("Stablecoins available to spend (e.g. ['USDC','USDT','EURC'])."),
+  source_symbols: z.array(z.string()).min(1).max(50).describe("Stablecoins available to spend, max 50 (e.g. ['USDC','USDT','EURC'])."),
   target_symbol: z.string().optional().describe("Specific output token; defaults to a stablecoin matching target_currency."),
 });
 
@@ -344,7 +359,7 @@ export const FxQuoteDiffInput = z.object({
 export const CompareCorridorsInput = z.object({
   target: CurrencyRef.describe("Output currency or token to deliver."),
   target_amount: z.number().positive().describe("Exact amount of `target` to deliver."),
-  sources: z.array(z.string()).min(1).describe("Candidate source token symbols to compare."),
+  sources: z.array(z.string()).min(1).max(50).describe("Candidate source token symbols to compare (max 50)."),
   max_concurrency: z.number().int().positive().max(10).optional(),
   gas_mode: z.enum(["receive_less", "pay_more"]).optional(),
 });
@@ -352,9 +367,11 @@ export const CompareCorridorsInput = z.object({
 export const SpreadRadarInput = z.object({
   currencies: z
     .array(z.string())
+    .max(12)
     .optional()
     .describe(
-      "List of ISO fiat codes to scan (e.g. ['USD','SGD','MYR']). Defaults to USD/SGD/MYR/EUR/GBP/JPY.",
+      "List of ISO fiat codes to scan, max 12 (e.g. ['USD','SGD','MYR']). Defaults to USD/SGD/MYR/EUR/GBP/JPY. " +
+        "Cost is quadratic: n currencies issue n*(n-1) FX calls, so 12 is already 132.",
     ),
   spread_alert_bps: z
     .number()
@@ -517,6 +534,135 @@ export const FxRateOutput = z.object({
   as_of_24h_ago: z.union([z.number(), z.null()]).optional(),
   change_pct: z.union([z.string(), z.null()]).optional(),
 }).passthrough();
+
+// ── discovery outputs ────────────────────────────────────────────────────
+// Every schema below is .passthrough(): the SDK VALIDATES structuredContent
+// against outputSchema, so a field the handler emits but the schema omits
+// turns a working tool into a runtime error. Passthrough keeps these
+// descriptive (hosts get real structure) without being a breakage risk when
+// a handler or the upstream /tokens payload grows a field.
+
+const TokenSummary = z
+  .object({
+    symbol: z.string(),
+    address: z.string(),
+    decimals: z.number(),
+  })
+  .passthrough();
+
+export const GetMarketsOutput = z
+  .object({
+    count: z.number(),
+    // Shape verified against live api.sera.cx/api/v1/markets. Only fields the
+    // API actually returns may be required here: the SDK validates
+    // structuredContent against this schema, so a required field the payload
+    // lacks turns get_markets into a hard error for every caller.
+    markets: z.array(
+      z
+        .object({
+          symbol: z.string(),
+          base_address: z.string(),
+          quote_address: z.string(),
+          base_symbol: z.string(),
+          quote_symbol: z.string(),
+          base_decimals: z.number(),
+          quote_decimals: z.number(),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+
+export const GetTradingPairsOutput = z
+  .object({
+    token: TokenSummary,
+    count: z.number(),
+    note: z.string(),
+    pairs: z.array(
+      z
+        .object({
+          pair: z.string(),
+          // Side to trade to LEAVE the queried token, not the market's own side.
+          direction: z.enum(["ASK", "BID"]),
+          from: z.object({ symbol: z.string(), address: z.string() }).passthrough(),
+          to: z.object({ symbol: z.string(), address: z.string() }).passthrough(),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+
+export const GetWalletInfoOutput = z
+  .object({
+    signer_mode: z.enum(["local", "external", "readonly"]),
+    // null is the CORRECT answer in external/readonly mode, not a failure.
+    address: z.union([z.string(), z.null()]),
+    address_error: z.string().optional(),
+    can_sign: z.boolean(),
+    execution_tools_enabled: z.boolean(),
+    network: z.enum(["mainnet", "sepolia"]),
+    base_url: z.string(),
+    note: z.string(),
+  })
+  .passthrough();
+
+export const SearchCoinsOutput = z
+  .object({
+    query: z.string(),
+    count: z.number(),
+    matches: z.array(
+      z
+        .object({
+          symbol: z.string(),
+          name: z.string().optional(),
+          fiat: z.string().optional(),
+          address: z.string(),
+          decimals: z.number(),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+
+// Two shapes behind one schema: found:true carries the registry record,
+// found:false carries error+hint. Optional fields rather than a discriminated
+// union so hosts that flatten JSON Schema anyOf still render something useful.
+export const GetCoinMetadataOutput = z
+  .object({
+    found: z.boolean(),
+    symbol: z.string(),
+    name: z.string().optional(),
+    fiat: z.string().optional(),
+    address: z.string().optional(),
+    decimals: z.number().optional(),
+    error: z.string().optional(),
+    hint: z.string().optional(),
+  })
+  .passthrough();
+
+// Four shapes: unknown symbol, history disabled, no fiat tag to imply a pair,
+// and the populated case. `observations` is always an array when found:true,
+// so agents can iterate without a shape check.
+export const GetCoinHistoryOutput = z
+  .object({
+    found: z.boolean(),
+    symbol: z.string(),
+    pair: z.string().optional(),
+    enabled: z.boolean().optional(),
+    days: z.number().optional(),
+    observation_count: z.number().optional(),
+    observations: z
+      .array(
+        z
+          .object({ ts: z.number(), rate: z.number(), source: z.string() })
+          .passthrough(),
+      )
+      .optional(),
+    note: z.string().optional(),
+    error: z.string().optional(),
+    hint: z.string().optional(),
+  })
+  .passthrough();
 
 export const ListCurrenciesOutput = z.object({
   count: z.number(),

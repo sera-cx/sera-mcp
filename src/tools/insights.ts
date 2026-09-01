@@ -1,4 +1,5 @@
 import type { AppContext } from "../config.js";
+import { createLimit } from "../util/limit.js";
 
 /**
  * spread_radar — pure-FX consistency check that needs no liquidity. Two signals:
@@ -43,8 +44,13 @@ export async function spreadRadar(
     }
   }
 
+  // Bounded concurrency, not a bare Promise.all: the pair list is quadratic in
+  // `currencies`, so an unbounded map fires n*(n-1) simultaneous FX requests
+  // (12 currencies -> 132). Same limiter scan_markets and infer_book use.
+  const limit = createLimit(8);
+
   await Promise.all(
-    ordered.map(async ([a, b]) => {
+    ordered.map(([a, b]) => limit(async () => {
       try {
         const r = await ctx.sera.getFxRate(a, b);
         const n = Number(r.rate);
@@ -53,7 +59,7 @@ export async function spreadRadar(
       } catch (e: any) {
         errors.push({ pair: `${a}/${b}`, error: e?.message ?? String(e) });
       }
-    }),
+    })),
   );
 
   // ---- Pair asymmetry ----

@@ -36,7 +36,16 @@ export async function scanMarkets(
   let pairs: PairSpec[] = args.pairs ?? [];
   let totalAvailable = pairs.length;
   let truncated = false;
-  if (!args.pairs) {
+  if (args.pairs) {
+    // An explicit list previously skipped the max_pairs clamp entirely, so a
+    // single call could fan out one upstream quote per entry with no ceiling.
+    // Apply the same cap here — one tool call must never become an unbounded
+    // amplifier against Sera's API from the operator's IP and API key.
+    if (pairs.length > maxPairs) {
+      truncated = true;
+      pairs = pairs.slice(0, maxPairs);
+    }
+  } else {
     const { markets } = await ctx.sera.getMarkets();
     const allowed = ctx.policy.config.allowedSymbols;
     const filtered = (args.only_policy_allowed ?? true) && allowed.length

@@ -9,7 +9,89 @@ All notable changes to `sera-mcp` are documented in this file. Versions follow [
 - `sera.approval_status`, a read-only Vault allowance check. It resolves the Vault from live config and returns an explicit `sera.build_approve` next step only when the allowance is insufficient; it never builds, signs, or broadcasts a transaction.
 - Documentation for the live-Vault allowance flow and its 56-tool registry surface.
 
-### Changed — docs / defaults reconciled to the live 56-tool registry
+### Added — tools ported from `sera-mcp-v2` (56 → 58 tools)
+`sera-cx/sera-mcp-v2` is a standalone single-file prototype, not a successor to this
+package. Both talk to the same `/api/v1` surface, and this server's endpoint coverage
+is a superset (26 paths vs 10), so its only real contribution was a few tools that had
+no equivalent here. Those are now ported and v2 can be retired.
+
+- `sera.get_trading_pairs` (`src/tools/core.ts`) — every market a single token can route
+  through, with the side (ASK/BID) you'd trade to leave it. Token-centric view of
+  `/markets` that `sera.get_markets` (whole catalog) doesn't provide. Unlike v2's version
+  it takes any reference `resolveToken` understands — symbol, 0x address, or fiat tag —
+  not just a raw address, and reuses the existing 10-min markets cache (no new endpoint).
+- `sera.get_wallet_info` (`src/tools/admin.ts`) — signer mode, resolved taker address,
+  and whether execution tools are exposed. `sera.doctor` reports signer *mode* but never
+  the resolved address, and costs several API round-trips; this is local-only. Returns
+  `address: null` in external/readonly mode, which is the correct answer rather than an
+  error. Deliberately omits v2's `balance_eth` field: v2 held an RPC URL and a private
+  key, this server holds neither by default, and adding an RPC dependency to report gas
+  would undo the external-signer posture.
+- `test/ported-tools.test.ts` (9 tests) — direction/ASK/BID invariants, all
+  three token-reference forms, empty-vs-unknown-token distinction, and `get_wallet_info`
+  across all three signer modes including signer failure and the no-gas-balance guarantee.
+
+### Added — structured output for the discovery surface (4 → 10 tools with `outputSchema`)
+`create-server.ts` emits `structuredContent` whenever a tool declares an `outputSchema`,
+and the MCP SDK **validates** that payload against the schema. That makes schema drift a
+runtime failure for every caller, not a soft degradation — so the rollout is deliberate
+and test-guarded rather than bulk-generated.
+
+- `GetMarketsOutput`, `GetTradingPairsOutput`, `GetWalletInfoOutput`, `SearchCoinsOutput`,
+  `GetCoinMetadataOutput`, `GetCoinHistoryOutput` — all 8 `discovery` tools now declare
+  structured output. `get_coin_metadata` (2 return shapes) and `get_coin_history` (4)
+  are modelled as one permissive object each with optional fields, so every branch
+  validates without a discriminated union that hosts would flatten anyway.
+- All new schemas are `.passthrough()`. A strict object rejects unknown keys, so a
+  handler that later grows a field would start erroring for every caller. The 4 pre-existing
+  v0.7.0 schemas are unchanged.
+- `test/output-schemas.test.ts` (12 tests) — parses each schema against the
+  handler's **actual** output, covering the not-found / history-disabled / untagged-token
+  branches and a token with no `name` or `fiat_currency`. Two registry invariants lock the
+  rollout in: every `discovery` tool must declare an `outputSchema`, and the set of strict
+  (non-passthrough) schemas may never grow.
+- Verified end-to-end: `createServer()` registers all 57 default-mode tools with the new
+  schemas, confirming Zod → JSON Schema conversion succeeds for every one.
+
+### Fixed — `SeraMarket` field names did not match the API
+`src/sera/types.ts` declared `base_token` / `quote_token` / `display_pair`. Live
+`GET /markets` returns `symbol` / `base_address` / `quote_address` (verified against
+api.sera.cx: 780 rows, and that key set is the union across all of them). The interface
+had apparently never matched — `scan.ts` and `deals.ts` both read
+`m.base_symbol ?? m.base_address`, working around it rather than fixing it.
+
+Consequences on this branch before the fix, both caught by review against the live API
+rather than by the test suite:
+
+- `sera.get_trading_pairs` threw `Cannot read properties of undefined (reading
+  'toLowerCase')` on every call.
+- `GetMarketsOutput` required the three non-existent fields, so SDK output validation
+  rejected every `sera.get_markets` response — breaking a tool that previously worked,
+  since it had no `outputSchema` before. `.passthrough()` does not help here: it tolerates
+  unknown keys, it does not make declared keys optional.
+
+The interface now matches the live payload, `get_trading_pairs` returns `pair` (from the
+market's `symbol`), and both are verified end-to-end against production: 780 markets and
+39 real BRZ pairs, each validated through its schema.
+
+Root cause of the tests missing it: the fixtures were untyped object literals using the
+same invented field names, so 19 tests passed against a shape the API never returns. The
+fixtures are now declared `SeraMarket[]`, making that drift a compile error, and
+`test/output-schemas.test.ts` additionally validates a verbatim recorded live row.
+
+### Not ported
+- **v2's `get_clob_swap_quote`** — not a distinct CLOB path despite the name. It POSTs the
+  same `/swap/quote` endpoint with the same body shape this server's `sera.get_quote`
+  already uses (`SwapQuoteRequest`), minus `gas_mode`. Adding it would be a duplicate tool
+  for zero new capability.
+- **v2's one-shot `execute_deposit` / `execute_withdraw` and auto-broadcast approve inside
+  `execute_swap`** — a design conflict, not a gap. This server deliberately splits
+  build → sign → send (`build_deposit` + `send_tx`, and the 3-step dual-sig withdraw flow)
+  because the default is `SERA_SIGNER_MODE=external` with no key on disk. v2's one-shot
+  flow requires the server to hold a private key. If wanted, these belong behind the same
+  local-signer gate as `convert_and_send`, not as unconditional tools.
+
+### Changed — docs / defaults reconciled to the live 56-tool surface
 - `SERVER_VERSION` in `src/server/create-server.ts` aligned to **0.8.3** (was still advertising 0.8.2 in the MCP handshake).
 - README / ARCHITECTURE / CONTRIBUTING: tool count **32 → 56**, full category table matching `src/tools/registry.ts`, and accurate smoke-test expectation (**55** under default `external` signer because `convert_and_send` is local-only).
 - `sera://help/tools` resource (`src/resources.ts`): count **51 → 56**, added missing coin / health / corridor tools so the in-MCP catalog matches the registry.

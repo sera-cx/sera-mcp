@@ -4,8 +4,13 @@
   "description": "Multi-currency MCP server backed by Sera (stablecoin FX). Lets any agent discover currencies, quote, route, and execute stablecoin swaps through one standard tool interface.",
   "type": "module",
   "homepage": "https://agents.sera.cx",
-  "repository": { "type": "git", "url": "git+https://github.com/sera-cx/sera-mcp.git" },
-  "bugs": { "url": "https://github.com/sera-cx/sera-mcp/issues" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sera-cx/sera-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sera-cx/sera-mcp/issues"
+  },
   "license": "MIT",
   "mcpName": "io.github.sera-cx/sera-mcp",
   "keywords": [
@@ -44,13 +49,15 @@
   ],
   "scripts": {
     "build": "tsc",
+    "clean": "rm -rf dist",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "audit": "npm audit --omit=dev --audit-level=high",
-    "check": "npm run typecheck && npm run test && npm run audit"
+    "check": "npm run typecheck && npm run test && npm run audit",
+    "prepublishOnly": "npm run clean && npm run build && npm run typecheck && npm test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.0",
