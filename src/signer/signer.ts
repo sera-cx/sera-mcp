@@ -31,11 +31,45 @@ const INTENT_TYPES: Record<string, TypedDataField[]> = {
   ],
 };
 
+/**
+ * A 32-byte hex private key, with or without the 0x prefix.
+ * Surrounding whitespace is tolerated and stripped by the caller — secret files
+ * and `docker secret` mounts routinely carry a trailing newline.
+ */
+const PRIVATE_KEY_RE = /^(0x)?[0-9a-fA-F]{64}$/;
+
 class LocalSigner implements Signer {
   readonly mode: SignerMode = "local";
   private wallet: Wallet;
   constructor(privateKey: string) {
-    this.wallet = new Wallet(privateKey);
+    // Validate the SHAPE ourselves before handing the value to ethers.
+    //
+    // ethers only redacts the key when it parses as 32 bytes of hex. For any
+    // other input `getBytes` throws "invalid BytesLike value (... value="<the
+    // raw key>" ...)", and that message travels in err.stack up to the fatal
+    // handler in src/index.ts, which JSON-logs it to stderr. A key with a
+    // trailing newline — the normal result of reading a secret file — would
+    // therefore be printed in full to the container log.
+    //
+    // Never interpolate the key (or any slice of it) into what we throw.
+    const trimmed = privateKey.trim();
+    if (!PRIVATE_KEY_RE.test(trimmed)) {
+      throw new Error(
+        "SIGNER_PRIVATE_KEY is not a valid private key: expected 32 bytes of hex " +
+          `(64 hex chars, optional 0x prefix), got ${trimmed.length} characters. ` +
+          "Value withheld from this message and from logs.",
+      );
+    }
+    try {
+      this.wallet = new Wallet(trimmed.startsWith("0x") ? trimmed : `0x${trimmed}`);
+    } catch {
+      // Shape was right but ethers still rejected it (e.g. key out of the
+      // secp256k1 range). Swallow the original error — it embeds the key.
+      throw new Error(
+        "SIGNER_PRIVATE_KEY is well-formed hex but was rejected as a secp256k1 key. " +
+          "Value withheld from this message and from logs.",
+      );
+    }
   }
   async address() {
     return this.wallet.address;

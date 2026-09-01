@@ -159,8 +159,9 @@ export const FindCheapestPathInput = z.object({
 export const ScanMarketsInput = z.object({
   pairs: z
     .array(z.object({ base: z.string(), quote: z.string() }))
+    .max(500)
     .optional()
-    .describe("Explicit list of pairs. If omitted, enumerates from /markets and applies max_pairs."),
+    .describe("Explicit list of pairs (max 500). If omitted, enumerates from /markets and applies max_pairs."),
   notional_per_quote: z
     .number()
     .positive()
@@ -195,8 +196,9 @@ export const ProbeDepthInput = z.object({
   to: CurrencyRef,
   sizes: z
     .array(z.number().positive())
+    .max(50)
     .optional()
-    .describe("Human input sizes to probe. Default [100, 1000, 10000, 100000]."),
+    .describe("Human input sizes to probe (max 50). Default [100, 1000, 10000, 100000]."),
   gas_mode: z.enum(["receive_less", "pay_more"]).optional(),
   max_concurrency: z.number().int().positive().optional(),
 });
@@ -213,8 +215,9 @@ export const InferBookInput = z.object({
   quote: CurrencyRef,
   sizes: z
     .array(z.number().positive())
+    .max(50)
     .optional()
-    .describe("Probe sizes (in respective input currency). Default log-spaced 100→1M."),
+    .describe("Probe sizes (max 50, in respective input currency). Default log-spaced 100→1M."),
   gas_mode: z.enum(["receive_less", "pay_more"]).optional(),
   max_concurrency: z.number().int().positive().optional(),
 });
@@ -226,7 +229,7 @@ export const FxHistoryInput = z.object({
 });
 
 export const TreasuryValueInput = z.object({
-  owner_addresses: z.array(z.string()).min(1).describe("One or more 0x... wallets to aggregate."),
+  owner_addresses: z.array(z.string()).min(1).max(50).describe("1–50 0x... wallets to aggregate."),
   target_currency: z.string().optional().describe("ISO fiat to value in. Default 'USD'."),
   include_zero: z.boolean().optional().describe("Include zero-balance lines. Default false."),
 });
@@ -234,7 +237,7 @@ export const TreasuryValueInput = z.object({
 export const ExposureReportInput = TreasuryValueInput.pick({ owner_addresses: true, target_currency: true });
 
 export const RebalancePlanInput = z.object({
-  owner_addresses: z.array(z.string()).min(1),
+  owner_addresses: z.array(z.string()).min(1).max(50),
   target_weights: z
     .record(z.number().nonnegative())
     .describe("Map of fiat code → weight, e.g. { USD: 50, SGD: 30, MYR: 20 }. Normalized internally."),
@@ -251,7 +254,7 @@ export const PayInvoiceInput = z.object({
   recipient: z.string(),
   amount: z.number().positive().describe("Recipient should receive exactly this in `target_currency` units."),
   target_currency: z.string().describe("ISO fiat the recipient wants (e.g. 'SGD')."),
-  source_symbols: z.array(z.string()).min(1).describe("Stablecoins available to spend (e.g. ['USDC','USDT','EURC'])."),
+  source_symbols: z.array(z.string()).min(1).max(50).describe("Stablecoins available to spend, max 50 (e.g. ['USDC','USDT','EURC'])."),
   target_symbol: z.string().optional().describe("Specific output token; defaults to a stablecoin matching target_currency."),
 });
 
@@ -356,7 +359,7 @@ export const FxQuoteDiffInput = z.object({
 export const CompareCorridorsInput = z.object({
   target: CurrencyRef.describe("Output currency or token to deliver."),
   target_amount: z.number().positive().describe("Exact amount of `target` to deliver."),
-  sources: z.array(z.string()).min(1).describe("Candidate source token symbols to compare."),
+  sources: z.array(z.string()).min(1).max(50).describe("Candidate source token symbols to compare (max 50)."),
   max_concurrency: z.number().int().positive().max(10).optional(),
   gas_mode: z.enum(["receive_less", "pay_more"]).optional(),
 });
